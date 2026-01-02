@@ -29,6 +29,7 @@ MEALgorithm is a modern, AI-enhanced nutrition tracking application designed to 
 - **Secure Profiles**: User data isolated via Row Level Security (RLS).
 - **Responsive & Fast**: Optimistic UI updates for a snappy feel on all devices.
 - **Local Timezone Support**: Accurate day-to-day tracking regardless of where you are in the world.
+- **Optimazed Cache Strategy**:Different cache strategies have been applied in different situations to improve performance.
 
 ## 🛠️ Tech Stack
 
@@ -80,8 +81,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 # Gemini AI Configuration
 GEMINI_API_KEY=your_gemini_api_key
 ```
-
-> **Note**: See [SECRETS_GUIDE.md](./SECRETS_GUIDE.md) for detailed instructions on where to find these keys.
 
 ### 4. Database Setup
 
