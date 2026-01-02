@@ -1,36 +1,140 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MEALgorithm Demo
 
-## Getting Started
+A full-stack nutrition tracking application built with **Next.js 14**, **Supabase**, and **Google Gemini AI**.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- 🔐 **Authentication**: OAuth login via Google/GitHub using Supabase Auth
+- 📝 **Meal Logging**: Log meals via text description or photo upload
+- 🤖 **AI Analysis**: Gemini 2.0 Flash parses meals into structured nutritional data
+- 📊 **Dashboard**: View daily/weekly calorie and macro summaries
+- 💡 **AI Recommendations**: Get personalized meal suggestions based on your goals
+
+## Tech Stack
+
+- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS
+- **Backend**: Next.js Server Actions
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth (OAuth)
+- **Storage**: Supabase Storage (meal images)
+- **AI**: Google Gemini 2.5 Flash via `@google/generative-ai`
+- **Validation**: Zod
+
+## Prerequisites
+
+- Node.js 18+
+- A Supabase account
+- A Google AI Studio account (for Gemini API key)
+
+## Environment Variables
+
+Create a `.env.local` file in the project root:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+GEMINI_API_KEY=your-gemini-api-key
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Supabase Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1. Create a new Supabase project
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Go to [supabase.com](https://supabase.com) and create a new project.
 
-## Learn More
+### 2. Run the database migration
 
-To learn more about Next.js, take a look at the following resources:
+Copy the contents of `supabase/migrations/20240101000000_init_schema.sql` and run it in:
+**Supabase Dashboard > SQL Editor > New Query > Paste & Run**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+This will create:
+- `profiles` table (user settings, calorie target)
+- `meals` table (meal logs with AI analysis)
+- `food_catalog` table (shared food database)
+- `meal_images` storage bucket
+- All necessary RLS policies
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 3. Configure OAuth Providers
 
-## Deploy on Vercel
+1. Go to **Authentication > Providers**
+2. Enable **Google** and/or **GitHub**
+3. Add the OAuth credentials from the respective developer consoles
+4. Set the callback URL to: `http://localhost:3000/auth/callback` (for local dev)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 4. Create Storage Bucket (if not created by migration)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Go to **Storage**
+2. Create a bucket named `meal_images`
+3. Set it to **Public** (for easy image display)
+
+## Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Project Structure
+
+```
+src/
+├── app/                    # Next.js App Router pages
+│   ├── auth/               # Auth callback & error routes
+│   ├── dashboard/          # Dashboard page
+│   ├── log/                # Meal logging page
+│   ├── login/              # Login page
+│   └── recommendations/    # AI recommendations page
+├── components/
+│   ├── auth/               # Auth components
+│   ├── dashboard/          # Dashboard components
+│   ├── meals/              # Meal logging components
+│   └── recommendations/    # Recommendation components
+├── lib/
+│   ├── ai/                 # Gemini client, prompts, schemas
+│   ├── dashboard/          # Dashboard actions
+│   ├── meals/              # Meal CRUD actions
+│   ├── recommendations/    # Recommendation actions
+│   └── supabase/           # Supabase clients
+└── types/                  # TypeScript types
+
+supabase/
+└── migrations/             # SQL migration files
+```
+
+## Usage Guide
+
+### 1. Login
+- Click "Login with Google" or "Login with GitHub"
+- You'll be redirected back to the app after authentication
+
+### 2. Log a Meal
+- Click "Log Meal" on the home page
+- Choose **Text** mode and describe your meal, OR
+- Choose **Photo** mode and upload an image
+- Click "Analyze with AI" to get nutritional breakdown
+- Review the preview and click "Confirm & Save"
+
+### 3. View Dashboard
+- Click "Dashboard" to see your nutrition summary
+- Toggle between "Today" and "This Week" views
+- See AI-generated feedback on your progress
+
+### 4. Get Recommendations
+- Click "Suggestions" for AI-powered meal ideas
+- Recommendations are personalized based on your goals and recent meals
+
+## Security Notes
+
+- ✅ All database tables have Row Level Security (RLS) enabled
+- ✅ Users can only access their own data
+- ✅ `GEMINI_API_KEY` is server-side only (never exposed to client)
+- ✅ `SUPABASE_SERVICE_ROLE_KEY` is NOT used (all queries use user context)
+
+## License
+
+MIT
