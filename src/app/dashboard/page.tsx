@@ -13,10 +13,9 @@ export default async function DashboardPage() {
 
     return (
         <main className="min-h-screen relative overflow-hidden bg-gradient-to-br from-gray-50 via-white to-blue-50">
-            {/* Background Accent */}
             <div
-                className="absolute inset-0 opacity-40 pointer-events-none"
-                style={{ backgroundImage: "url('/images/dashboard-bg.png')", backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
+                className="fixed inset-0 opacity-50 pointer-events-none"
+                style={{ backgroundImage: "url('/images/dashboard-classic-diagonal.png')", backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
             />
 
             <div className="relative max-w-5xl mx-auto px-4 py-8">

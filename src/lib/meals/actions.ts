@@ -8,6 +8,7 @@ export async function saveMeal(data: {
     imagePath?: string
     analysis: unknown
     mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+    createdAt?: string
 }) {
     const supabase = createClient()
 
@@ -23,6 +24,7 @@ export async function saveMeal(data: {
         image_path: data.imagePath || null,
         analysis: data.analysis,
         meal_type: data.mealType || null,
+        created_at: data.createdAt || new Date().toISOString(),
     })
 
     if (error) {

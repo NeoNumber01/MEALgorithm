@@ -14,8 +14,8 @@ export default async function RecommendationsPage() {
         <main className="min-h-screen relative overflow-hidden bg-gradient-to-br from-gray-50 via-white to-green-50">
             {/* Background Watermark */}
             <div
-                className="absolute inset-0 opacity-20 pointer-events-none"
-                style={{ backgroundImage: "url('/images/suggestions-bg.png')", backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
+                className="fixed inset-0 z-0 opacity-50 pointer-events-none"
+                style={{ backgroundImage: "url('/images/recommendations-classic-diagonal.png')", backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
             />
 
             <div className="relative max-w-5xl mx-auto px-4 py-8">

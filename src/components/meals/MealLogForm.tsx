@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { analyzeMeal } from '@/lib/ai/actions'
 import { saveMeal, uploadMealImage } from '@/lib/meals/actions'
 import { MealAnalysis } from '@/lib/ai/schema'
+import { notifyDataUpdated } from '@/lib/cache-utils'
 
 type Step = 'input' | 'preview' | 'saving' | 'done'
 
@@ -17,6 +18,11 @@ export default function MealLogForm() {
     const [error, setError] = useState<string | null>(null)
     const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('lunch')
 
+    // Date/Time state (defaults to now)
+    const now = new Date()
+    const [date, setDate] = useState(now.toLocaleDateString('en-CA')) // YYYY-MM-DD local
+    const [time, setTime] = useState(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`)
+
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file) {
@@ -27,6 +33,12 @@ export default function MealLogForm() {
             }
             reader.readAsDataURL(file)
         }
+    }
+
+    const handleSetToNow = () => {
+        const now = new Date()
+        setDate(now.toLocaleDateString('en-CA'))
+        setTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`)
     }
 
     const handleAnalyze = async () => {
@@ -77,6 +89,7 @@ export default function MealLogForm() {
             imagePath,
             analysis,
             mealType,
+            createdAt: new Date(`${date}T${time}`).toISOString(),
         })
 
         if ('error' in saveResult) {
@@ -85,6 +98,7 @@ export default function MealLogForm() {
             return
         }
 
+        notifyDataUpdated()
         setStep('done')
     }
 
@@ -95,6 +109,10 @@ export default function MealLogForm() {
         setImagePreview(null)
         setAnalysis(null)
         setError(null)
+        // Reset time to now on new entry
+        const now = new Date()
+        setDate(now.toLocaleDateString('en-CA'))
+        setTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`)
     }
 
     if (step === 'done') {
@@ -184,6 +202,49 @@ export default function MealLogForm() {
                             )}
                         </div>
                     )}
+
+                    <div className="grid grid-cols-2 gap-6 bg-white/40 p-5 rounded-3xl border border-white/60 shadow-sm backdrop-blur-sm">
+                        <div className="relative group">
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1 group-hover:text-purple-600 transition-colors">
+                                Date
+                            </label>
+                            <div className="relative transition-transform duration-200 group-hover:-translate-y-0.5">
+                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
+                                    <span className="text-lg opacity-70 grayscale group-hover:grayscale-0 transition-all duration-300">📅</span>
+                                </div>
+                                <input
+                                    type="date"
+                                    value={date}
+                                    max={new Date().toLocaleDateString('en-CA')}
+                                    onChange={(e) => setDate(e.target.value)}
+                                    className="w-full pl-11 pr-4 py-3 bg-white/80 border-2 border-transparent focus:border-purple-300 rounded-2xl focus:ring-4 focus:ring-purple-100/50 transition-all outline-none text-gray-700 font-medium hover:bg-white hover:shadow-md cursor-pointer appearance-none"
+                                />
+                            </div>
+                        </div>
+                        <div className="relative group">
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1 group-hover:text-blue-600 transition-colors">
+                                Time
+                            </label>
+                            <div className="relative transition-transform duration-200 group-hover:-translate-y-0.5">
+                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
+                                    <span className="text-lg opacity-70 grayscale group-hover:grayscale-0 transition-all duration-300">⏰</span>
+                                </div>
+                                <input
+                                    type="time"
+                                    value={time}
+                                    onChange={(e) => setTime(e.target.value)}
+                                    className="w-full pl-11 pr-12 py-3 bg-white/80 border-2 border-transparent focus:border-blue-300 rounded-2xl focus:ring-4 focus:ring-blue-100/50 transition-all outline-none text-gray-700 font-medium hover:bg-white hover:shadow-md cursor-pointer appearance-none"
+                                />
+                                <button
+                                    onClick={handleSetToNow}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors z-20 group/btn"
+                                    title="Set to now"
+                                >
+                                    <span className="text-xl transform group-hover/btn:rotate-180 transition-transform duration-500">🔄</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -278,14 +339,17 @@ export default function MealLogForm() {
                         </button>
                     </div>
                 </div>
-            )}
+            )
+            }
 
-            {step === 'saving' && (
-                <div className="text-center py-12">
-                    <div className="animate-spin text-4xl mb-4">⏳</div>
-                    <p className="text-gray-600">Saving your meal...</p>
-                </div>
-            )}
-        </div>
+            {
+                step === 'saving' && (
+                    <div className="text-center py-12">
+                        <div className="animate-spin text-4xl mb-4">⏳</div>
+                        <p className="text-gray-600">Saving your meal...</p>
+                    </div>
+                )
+            }
+        </div >
     )
 }

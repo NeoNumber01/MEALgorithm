@@ -3,24 +3,17 @@
 import { useEffect, useState } from 'react'
 import { getDailyStats, getWeeklyStats, getUserProfile } from '@/lib/dashboard/actions'
 import { generateGoalFeedback } from '@/lib/dashboard/ai-feedback'
-import { getCachedFeedback, updateCachedFeedback } from '@/lib/profile/actions'
+import { updateCachedFeedback } from '@/lib/profile/actions'
 import { getNutritionalTargets } from '@/lib/nutrition/calculator'
 import { deleteMeal } from '@/lib/meals/actions'
 import CalorieGauge from './CalorieGauge'
 import Link from 'next/link'
 import MealDetailModal from './MealDetailModal'
+import StatisticsView from './StatisticsView'
 import ConfirmModal from '@/components/ui/ConfirmModal'
+import { notifyDataUpdated, getLastDataUpdateTime, CACHE_KEYS } from '@/lib/cache-utils'
 
 type ViewMode = 'today' | 'week'
-
-interface DailyData {
-    date: string
-    label: string
-    calories: number
-    protein: number
-    carbs: number
-    fat: number
-}
 
 interface NutritionTargets {
     calories: number
@@ -37,11 +30,6 @@ export default function DashboardContent() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         meals: any[]
     } | null>(null)
-    const [weeklyData, setWeeklyData] = useState<{
-        days: DailyData[]
-        totals: { calories: number; protein: number; carbs: number; fat: number }
-        averages: { calories: number; protein: number; carbs: number; fat: number }
-    } | null>(null)
     const [feedback, setFeedback] = useState<string>('')
     const [targets, setTargets] = useState<NutritionTargets>({
         calories: 2000,
@@ -53,69 +41,115 @@ export default function DashboardContent() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedMeal, setSelectedMeal] = useState<any>(null)
     const [mealToDelete, setMealToDelete] = useState<string | null>(null)
+    const [feedbackLoading, setFeedbackLoading] = useState(false)
+    const [lastUpdateTimestamp, setLastUpdateTimestamp] = useState<number>(() => {
+        if (typeof window !== 'undefined') return getLastDataUpdateTime()
+        return Date.now()
+    })
 
     useEffect(() => {
         loadData()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     const loadData = async () => {
         setLoading(true)
 
-        const today = new Date().toISOString().split('T')[0]
-        const [dailyResult, weeklyResult, profileResult, cachedResult] = await Promise.all([
-            getDailyStats(today),
-            getWeeklyStats(),
+        const today = new Date().toLocaleDateString('en-CA')
+        const lastDbUpdate = getLastDataUpdateTime()
+        let cachedTime = 0
+
+        // Check cache
+        try {
+            cachedTime = parseInt(localStorage.getItem(CACHE_KEYS.DASHBOARD_TIMESTAMP) || '0')
+            const cachedToday = localStorage.getItem(CACHE_KEYS.DASHBOARD_TODAY)
+            const cachedTargets = localStorage.getItem(CACHE_KEYS.DASHBOARD_TARGETS)
+            const cachedFeedback = localStorage.getItem(CACHE_KEYS.DASHBOARD_FEEDBACK)
+
+            if (cachedToday) {
+                const parsedToday = JSON.parse(cachedToday)
+                const cachedDate = parsedToday.date // Check stored date
+
+                // If cache exists, isn't from another day, and is fresh relative to db updates
+                if (cachedDate === today && cachedTime > lastDbUpdate) {
+                    setTodayData(parsedToday)
+                    if (cachedTargets) setTargets(JSON.parse(cachedTargets))
+                    if (cachedFeedback) setFeedback(cachedFeedback)
+                    setLoading(false)
+                    // Background refresh if cache is old (> 1 hour) but valid
+                    if (Date.now() - cachedTime < 3600000) return
+                }
+            }
+        } catch (e) {
+            console.error('Cache read error', e)
+        }
+
+        const timezoneOffset = new Date().getTimezoneOffset()
+        const now = new Date()
+
+        const startOfDay = new Date(now)
+        startOfDay.setHours(0, 0, 0, 0)
+
+        const endOfDay = new Date(now)
+        endOfDay.setHours(23, 59, 59, 999)
+
+        const startOfWeek = new Date(startOfDay)
+        startOfWeek.setDate(startOfWeek.getDate() - 6)
+
+        const [dailyResult, weeklyResult, profileResult] = await Promise.all([
+            getDailyStats(startOfDay.toISOString(), endOfDay.toISOString()),
+            getWeeklyStats(startOfWeek.toISOString(), endOfDay.toISOString(), timezoneOffset),
             getUserProfile(),
-            getCachedFeedback(),
         ])
+
+        console.log('Dashboard Data Load:', {
+            start: startOfDay.toISOString(),
+            end: endOfDay.toISOString(),
+            localDate: today,
+            cachedTime,
+            lastDbUpdate,
+            dailyMeals: 'error' in dailyResult ? 'error' : dailyResult.meals.length
+        })
 
         if (!('error' in dailyResult)) {
             setTodayData({
                 totals: dailyResult.totals,
                 meals: dailyResult.meals,
             })
-        }
+            setLastUpdateTimestamp(Date.now())
 
-        if (!('error' in weeklyResult)) {
-            setWeeklyData({
-                days: weeklyResult.days,
-                totals: weeklyResult.totals,
-                averages: weeklyResult.averages,
-            })
+            // Cache today's data with date
+            localStorage.setItem(CACHE_KEYS.DASHBOARD_TODAY, JSON.stringify({
+                date: today,
+                totals: dailyResult.totals,
+                meals: dailyResult.meals,
+            }))
+            localStorage.setItem(CACHE_KEYS.DASHBOARD_TIMESTAMP, Date.now().toString())
         }
 
         // Calculate targets from profile
+        let calculatedTargets = targets
         if (!('error' in profileResult) && profileResult.profile) {
-            const calculatedTargets = getNutritionalTargets(profileResult.profile)
+            calculatedTargets = getNutritionalTargets(profileResult.profile)
             setTargets(calculatedTargets)
+            localStorage.setItem(CACHE_KEYS.DASHBOARD_TARGETS, JSON.stringify(calculatedTargets))
         }
 
-        // Check if we should use cached feedback or generate new
-        let shouldGenerateFeedback = true
-
-        if (!('error' in cachedResult) && cachedResult.feedback) {
-            const lastMealTime = cachedResult.lastMealAt ? new Date(cachedResult.lastMealAt).getTime() : 0
-            const feedbackTime = cachedResult.updatedAt ? new Date(cachedResult.updatedAt).getTime() : 0
-
-            // Use cached feedback if it's newer than the last meal
-            if (feedbackTime > lastMealTime) {
-                setFeedback(cachedResult.feedback)
-                shouldGenerateFeedback = false
-            }
-        }
-
-        // Generate new AI feedback only if needed
-        if (shouldGenerateFeedback && !('error' in dailyResult) && !('error' in weeklyResult)) {
+        // Always generate fresh AI feedback for today's view
+        if (!('error' in dailyResult) && !('error' in weeklyResult)) {
+            setFeedbackLoading(true)
             const feedbackResult = await generateGoalFeedback({
                 todayCalories: dailyResult.totals.calories,
                 weeklyAvgCalories: weeklyResult.averages.calories,
-                targetCalories: targets.calories,
+                targetCalories: calculatedTargets.calories,
                 goalDescription: profileResult.profile?.goal_description,
             })
             setFeedback(feedbackResult.feedback)
+            setFeedbackLoading(false)
 
             // Cache the new feedback
             await updateCachedFeedback(feedbackResult.feedback)
+            localStorage.setItem(CACHE_KEYS.DASHBOARD_FEEDBACK, feedbackResult.feedback)
         }
 
         setLoading(false)
@@ -132,14 +166,25 @@ export default function DashboardContent() {
         const result = await deleteMeal(mealToDelete)
 
         if (result?.success) {
+            notifyDataUpdated()
             // Reload data to reflect changes
-            const today = new Date().toISOString().split('T')[0]
-            const dailyResult = await getDailyStats(today)
+            const startOfDay = new Date()
+            startOfDay.setHours(0, 0, 0, 0)
+            const endOfDay = new Date()
+            endOfDay.setHours(23, 59, 59, 999)
+
+            const dailyResult = await getDailyStats(startOfDay.toISOString(), endOfDay.toISOString())
             if (!('error' in dailyResult)) {
-                setTodayData({
+                const newData = {
                     totals: dailyResult.totals,
                     meals: dailyResult.meals,
-                })
+                }
+                setTodayData(newData)
+                setLastUpdateTimestamp(Date.now())
+
+                // Update cache
+                localStorage.setItem(CACHE_KEYS.DASHBOARD_TODAY, JSON.stringify(newData))
+                localStorage.setItem(CACHE_KEYS.DASHBOARD_TIMESTAMP, Date.now().toString())
             }
             // If the deleted meal was selected, close the modal
             if (selectedMeal?.id === mealToDelete) {
@@ -149,8 +194,6 @@ export default function DashboardContent() {
         setDeletingId(null)
         setMealToDelete(null)
     }
-
-    const currentData = viewMode === 'today' ? todayData?.totals : weeklyData?.averages
 
     if (loading) {
         return (
@@ -169,17 +212,28 @@ export default function DashboardContent() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">
-                        {viewMode === 'today' ? "Today's Overview" : 'Weekly Summary'}
+                        {viewMode === 'today' ? "Today's Overview" : 'Statistics & History'}
                     </h1>
                     <p className="text-gray-500 text-sm">
                         {viewMode === 'today'
                             ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-                            : 'Your last 7 days'
+                            : 'Analyze your eating habits'
                         }
                     </p>
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => {
+                            localStorage.removeItem('dashboard_today_data')
+                            localStorage.removeItem('dashboard_timestamp')
+                            loadData()
+                        }}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        title="Refresh Data"
+                    >
+                        🔄
+                    </button>
                     <div className="flex bg-gray-100 p-1 rounded-xl">
                         <button
                             onClick={() => setViewMode('today')}
@@ -197,7 +251,7 @@ export default function DashboardContent() {
                                 : 'text-gray-500 hover:text-gray-700'
                                 }`}
                         >
-                            📊 Week
+                            📊 Statistics
                         </button>
                     </div>
                     <Link
@@ -210,146 +264,124 @@ export default function DashboardContent() {
                 </div>
             </div>
 
-            {/* Calorie Gauge Card */}
-            <div className="bg-white/15 backdrop-blur-3xl rounded-3xl border border-white/20 shadow-2xl p-8 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:bg-white/20">
-                <CalorieGauge
-                    current={currentData?.calories || 0}
-                    target={targets.calories}
-                    label={viewMode === 'today' ? "Today's Calories" : 'Daily Average'}
-                />
-            </div>
+            {/* Today View Content */}
+            {viewMode === 'today' && (
+                <>
+                    {/* Calorie Gauge Card */}
+                    <div className="bg-white/15 backdrop-blur-3xl rounded-3xl border border-white/20 shadow-2xl p-8 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:bg-white/20">
+                        <CalorieGauge
+                            current={todayData?.totals?.calories || 0}
+                            target={targets.calories}
+                            label="Today's Calories"
+                        />
+                    </div>
 
-            {/* Macro Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Protein */}
-                <div className="relative overflow-hidden bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl p-6 text-white shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <div className="relative">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="text-2xl">🥩</span>
-                            <span className="text-sm font-medium opacity-90">Protein</span>
+                    {/* Macro Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Protein */}
+                        <div className="relative overflow-hidden bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl p-6 text-white shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                            <div className="relative">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-2xl">🥩</span>
+                                    <span className="text-sm font-medium opacity-90">Protein</span>
+                                </div>
+                                <div className="text-4xl font-bold mb-1">
+                                    {todayData?.totals?.protein || 0}g
+                                </div>
+                                <div className="text-sm opacity-75 mb-3">of {targets.protein}g target</div>
+                                <div className="bg-white/20 rounded-full h-2">
+                                    <div
+                                        className="bg-white rounded-full h-2 transition-all duration-500"
+                                        style={{ width: `${Math.min(100, ((todayData?.totals?.protein || 0) / targets.protein) * 100)}%` }}
+                                    />
+                                </div>
+                                <div className="text-xs mt-2 opacity-75">
+                                    {Math.round(((todayData?.totals?.protein || 0) / targets.protein) * 100)}% complete
+                                </div>
+                            </div>
                         </div>
-                        <div className="text-4xl font-bold mb-1">
-                            {currentData?.protein || 0}g
+
+                        {/* Carbs */}
+                        <div className="relative overflow-hidden bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-6 text-white shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                            <div className="relative">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-2xl">🍞</span>
+                                    <span className="text-sm font-medium opacity-90">Carbs</span>
+                                </div>
+                                <div className="text-4xl font-bold mb-1">
+                                    {todayData?.totals?.carbs || 0}g
+                                </div>
+                                <div className="text-sm opacity-75 mb-3">of {targets.carbs}g target</div>
+                                <div className="bg-white/20 rounded-full h-2">
+                                    <div
+                                        className="bg-white rounded-full h-2 transition-all duration-500"
+                                        style={{ width: `${Math.min(100, ((todayData?.totals?.carbs || 0) / targets.carbs) * 100)}%` }}
+                                    />
+                                </div>
+                                <div className="text-xs mt-2 opacity-75">
+                                    {Math.round(((todayData?.totals?.carbs || 0) / targets.carbs) * 100)}% complete
+                                </div>
+                            </div>
                         </div>
-                        <div className="text-sm opacity-75 mb-3">of {targets.protein}g target</div>
-                        <div className="bg-white/20 rounded-full h-2">
-                            <div
-                                className="bg-white rounded-full h-2 transition-all duration-500"
-                                style={{ width: `${Math.min(100, ((currentData?.protein || 0) / targets.protein) * 100)}%` }}
-                            />
-                        </div>
-                        <div className="text-xs mt-2 opacity-75">
-                            {Math.round(((currentData?.protein || 0) / targets.protein) * 100)}% complete
+
+                        {/* Fat */}
+                        <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                            <div className="relative">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-2xl">🧈</span>
+                                    <span className="text-sm font-medium opacity-90">Fat</span>
+                                </div>
+                                <div className="text-4xl font-bold mb-1">
+                                    {todayData?.totals?.fat || 0}g
+                                </div>
+                                <div className="text-sm opacity-75 mb-3">of {targets.fat}g target</div>
+                                <div className="bg-white/20 rounded-full h-2">
+                                    <div
+                                        className="bg-white rounded-full h-2 transition-all duration-500"
+                                        style={{ width: `${Math.min(100, ((todayData?.totals?.fat || 0) / targets.fat) * 100)}%` }}
+                                    />
+                                </div>
+                                <div className="text-xs mt-2 opacity-75">
+                                    {Math.round(((todayData?.totals?.fat || 0) / targets.fat) * 100)}% complete
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Carbs */}
-                <div className="relative overflow-hidden bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-6 text-white shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <div className="relative">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="text-2xl">🍞</span>
-                            <span className="text-sm font-medium opacity-90">Carbs</span>
+                    {/* AI Feedback */}
+                    {(feedback || feedbackLoading) && (
+                        <div className="relative overflow-hidden bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-lg">
+                            <div className="absolute -right-4 -bottom-4 text-8xl opacity-10">🤖</div>
+                            <div className="relative flex gap-4">
+                                <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl flex items-center justify-center text-2xl shadow-lg">
+                                    🤖
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-bold text-emerald-800 mb-1">AI Coach Insight</h3>
+                                    {feedbackLoading ? (
+                                        <div className="flex items-center gap-2 text-emerald-600">
+                                            <div className="w-4 h-4 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" />
+                                            <span className="animate-pulse">Analyzing your progress...</span>
+                                        </div>
+                                    ) : (
+                                        <p className="text-emerald-700 leading-relaxed">{feedback}</p>
+                                    )}
+                                </div>
+                            </div>
                         </div>
-                        <div className="text-4xl font-bold mb-1">
-                            {currentData?.carbs || 0}g
-                        </div>
-                        <div className="text-sm opacity-75 mb-3">of {targets.carbs}g target</div>
-                        <div className="bg-white/20 rounded-full h-2">
-                            <div
-                                className="bg-white rounded-full h-2 transition-all duration-500"
-                                style={{ width: `${Math.min(100, ((currentData?.carbs || 0) / targets.carbs) * 100)}%` }}
-                            />
-                        </div>
-                        <div className="text-xs mt-2 opacity-75">
-                            {Math.round(((currentData?.carbs || 0) / targets.carbs) * 100)}% complete
-                        </div>
-                    </div>
-                </div>
-
-                {/* Fat */}
-                <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <div className="relative">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="text-2xl">🧈</span>
-                            <span className="text-sm font-medium opacity-90">Fat</span>
-                        </div>
-                        <div className="text-4xl font-bold mb-1">
-                            {currentData?.fat || 0}g
-                        </div>
-                        <div className="text-sm opacity-75 mb-3">of {targets.fat}g target</div>
-                        <div className="bg-white/20 rounded-full h-2">
-                            <div
-                                className="bg-white rounded-full h-2 transition-all duration-500"
-                                style={{ width: `${Math.min(100, ((currentData?.fat || 0) / targets.fat) * 100)}%` }}
-                            />
-                        </div>
-                        <div className="text-xs mt-2 opacity-75">
-                            {Math.round(((currentData?.fat || 0) / targets.fat) * 100)}% complete
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* AI Feedback */}
-            {feedback && (
-                <div className="relative overflow-hidden bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-lg">
-                    <div className="absolute -right-4 -bottom-4 text-8xl opacity-10">🤖</div>
-                    <div className="relative flex gap-4">
-                        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl flex items-center justify-center text-2xl shadow-lg">
-                            🤖
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-emerald-800 mb-1">AI Coach Insight</h3>
-                            <p className="text-emerald-700 leading-relaxed">{feedback}</p>
-                        </div>
-                    </div>
-                </div>
+                    )}
+                </>
             )}
 
-            {/* Weekly Chart (if week view) */}
-            {viewMode === 'week' && weeklyData && (
-                <div className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-3xl p-6 shadow-xl transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:bg-white/20">
-                    <h3 className="font-bold text-gray-900 mb-6">📈 Weekly Calorie Intake</h3>
-                    <div className="flex items-end justify-between h-40 gap-3">
-                        {weeklyData.days.map((day) => {
-                            const percentage = targets.calories > 0
-                                ? Math.min(100, (day.calories / targets.calories) * 100)
-                                : 0
-                            const isToday = day.date === new Date().toISOString().split('T')[0]
-
-                            return (
-                                <div key={day.date} className="flex-1 flex flex-col items-center group">
-                                    <div className="text-xs font-medium text-gray-500 mb-1 opacity-0 group-hover:opacity-100 transition">
-                                        {day.calories} kcal
-                                    </div>
-                                    <div className="w-full bg-gray-100 rounded-xl relative" style={{ height: '120px' }}>
-                                        <div
-                                            className={`absolute bottom-0 w-full rounded-xl transition-all duration-500 ${isToday
-                                                ? 'bg-gradient-to-t from-purple-500 to-pink-400'
-                                                : 'bg-gradient-to-t from-blue-500 to-cyan-400'
-                                                }`}
-                                            style={{ height: `${percentage}%` }}
-                                        />
-                                        {percentage >= 100 && (
-                                            <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-sm">🎯</div>
-                                        )}
-                                    </div>
-                                    <p className={`text-xs mt-2 font-medium ${isToday ? 'text-purple-600' : 'text-gray-500'}`}>
-                                        {day.label}
-                                    </p>
-                                </div>
-                            )
-                        })}
-                    </div>
-                    <div className="mt-4 pt-4 border-t flex justify-between text-sm text-gray-500">
-                        <span>Target line: {targets.calories} kcal</span>
-                        <span>Weekly avg: {weeklyData.averages.calories} kcal</span>
-                    </div>
-                </div>
+            {/* Statistics View (if statistics view) */}
+            {viewMode === 'week' && (
+                <StatisticsView
+                    targetCalories={targets.calories}
+                    lastUpdateTimestamp={lastUpdateTimestamp}
+                />
             )}
 
             {/* Today's Meals */}
@@ -366,7 +398,7 @@ export default function DashboardContent() {
                             <div
                                 key={meal.id}
                                 onClick={() => setSelectedMeal(meal)}
-                                className="flex justify-between items-center p-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl hover:bg-white/10 transition-all group cursor-pointer"
+                                className="flex justify-between items-center p-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl hover:bg-white/10 hover:-translate-y-1 hover:shadow-lg transition-all group cursor-pointer"
                             >
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center text-lg">
@@ -411,7 +443,7 @@ export default function DashboardContent() {
 
             {/* Empty State */}
             {viewMode === 'today' && todayData && todayData.meals.length === 0 && (
-                <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-100 rounded-2xl p-12 text-center">
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-100 rounded-2xl p-12 text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
                     <div className="text-6xl mb-4">🍽️</div>
                     <h3 className="text-xl font-bold text-gray-900 mb-2">No meals logged yet</h3>
                     <p className="text-gray-500 mb-6">Start tracking your nutrition today!</p>
