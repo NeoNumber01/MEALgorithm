@@ -9,6 +9,7 @@ import { deleteMeal } from '@/lib/meals/actions'
 import CalorieGauge from './CalorieGauge'
 import Link from 'next/link'
 import MealDetailModal from './MealDetailModal'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 
 type ViewMode = 'today' | 'week'
 
@@ -51,6 +52,7 @@ export default function DashboardContent() {
     const [deletingId, setDeletingId] = useState<string | null>(null)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedMeal, setSelectedMeal] = useState<any>(null)
+    const [mealToDelete, setMealToDelete] = useState<string | null>(null)
 
     useEffect(() => {
         loadData()
@@ -119,11 +121,15 @@ export default function DashboardContent() {
         setLoading(false)
     }
 
-    const handleDelete = async (mealId: string) => {
-        if (!confirm('Are you sure you want to delete this meal?')) return
+    const handleDeleteClick = (mealId: string) => {
+        setMealToDelete(mealId)
+    }
 
-        setDeletingId(mealId)
-        const result = await deleteMeal(mealId)
+    const handleDeleteConfirm = async () => {
+        if (!mealToDelete) return
+
+        setDeletingId(mealToDelete)
+        const result = await deleteMeal(mealToDelete)
 
         if (result?.success) {
             // Reload data to reflect changes
@@ -136,13 +142,12 @@ export default function DashboardContent() {
                 })
             }
             // If the deleted meal was selected, close the modal
-            if (selectedMeal?.id === mealId) {
+            if (selectedMeal?.id === mealToDelete) {
                 setSelectedMeal(null)
             }
-        } else {
-            alert('Failed to delete meal')
         }
         setDeletingId(null)
+        setMealToDelete(null)
     }
 
     const currentData = viewMode === 'today' ? todayData?.totals : weeklyData?.averages
@@ -389,7 +394,7 @@ export default function DashboardContent() {
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation()
-                                            handleDelete(meal.id)
+                                            handleDeleteClick(meal.id)
                                         }}
                                         disabled={deletingId === meal.id}
                                         className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 transition-all disabled:opacity-50"
@@ -419,13 +424,25 @@ export default function DashboardContent() {
                 </div>
             )}
 
-            {/* Modal */}
+            {/* Meal Detail Modal */}
             {selectedMeal && (
                 <MealDetailModal
                     meal={selectedMeal}
                     onClose={() => setSelectedMeal(null)}
                 />
             )}
+
+            {/* Delete Confirmation Modal */}
+            <ConfirmModal
+                isOpen={mealToDelete !== null}
+                title="Delete Meal?"
+                message="This action cannot be undone. The meal record and its nutritional data will be permanently removed."
+                confirmText="Delete"
+                cancelText="Keep It"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => setMealToDelete(null)}
+                isLoading={deletingId !== null}
+            />
         </div>
     )
 }
