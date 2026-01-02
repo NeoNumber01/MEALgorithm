@@ -8,6 +8,7 @@ import { getNutritionalTargets } from '@/lib/nutrition/calculator'
 import { deleteMeal } from '@/lib/meals/actions'
 import CalorieGauge from './CalorieGauge'
 import Link from 'next/link'
+import MealDetailModal from './MealDetailModal'
 
 type ViewMode = 'today' | 'week'
 
@@ -48,6 +49,8 @@ export default function DashboardContent() {
         fat: 65,
     })
     const [deletingId, setDeletingId] = useState<string | null>(null)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [selectedMeal, setSelectedMeal] = useState<any>(null)
 
     useEffect(() => {
         loadData()
@@ -131,6 +134,10 @@ export default function DashboardContent() {
                     totals: dailyResult.totals,
                     meals: dailyResult.meals,
                 })
+            }
+            // If the deleted meal was selected, close the modal
+            if (selectedMeal?.id === mealId) {
+                setSelectedMeal(null)
             }
         } else {
             alert('Failed to delete meal')
@@ -353,7 +360,8 @@ export default function DashboardContent() {
                         {todayData.meals.map((meal, index) => (
                             <div
                                 key={meal.id}
-                                className="flex justify-between items-center p-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl hover:bg-white/10 transition-all group"
+                                onClick={() => setSelectedMeal(meal)}
+                                className="flex justify-between items-center p-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl hover:bg-white/10 transition-all group cursor-pointer"
                             >
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center text-lg">
@@ -379,7 +387,10 @@ export default function DashboardContent() {
                                         <span className="text-gray-400 text-sm ml-1">kcal</span>
                                     </div>
                                     <button
-                                        onClick={() => handleDelete(meal.id)}
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleDelete(meal.id)
+                                        }}
                                         disabled={deletingId === meal.id}
                                         className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 transition-all disabled:opacity-50"
                                         title="Delete meal"
@@ -406,6 +417,14 @@ export default function DashboardContent() {
                         📝 Log your meal
                     </Link>
                 </div>
+            )}
+
+            {/* Modal */}
+            {selectedMeal && (
+                <MealDetailModal
+                    meal={selectedMeal}
+                    onClose={() => setSelectedMeal(null)}
+                />
             )}
         </div>
     )
