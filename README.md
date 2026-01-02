@@ -5,13 +5,12 @@
 MEALgorithm is a modern, AI-enhanced nutrition tracking application designed to help users effortlessly monitor their diet. By leveraging Google's **Gemini Pro Vision** multimodal AI, users can log meals simply by taking a photo or describing user text. The application automatically analyzes the nutritional content (calories, protein, carbs, fat) and provides personalized feedback.
 
 ![Dashboard Preview](public/images/dashboard-fresh-elegant-v2.png)
-*(Note: Replace with actual screenshot path if available, or keep as placeholder)*
 
 ## ✨ Key Features
 
 ### 📸 Smart Meal Logging
 - **Multimodal Input**: Log meals via **Text Description** ("I had a chicken salad") or **Image Upload**.
-- **Gemini Vision AI**: Automatically detects ingredients, portions, and estimates nutritional values (Calories, Protein, Carbs, Fat).
+- **Gemini AI**: Automatically detects ingredients, portions, and estimates nutritional values (Calories, Protein, Carbs, Fat).
 - **Interactive Editing**: Review and adjust AI-generated estimates before saving.
 
 ### 📊 Comprehensive Dashboard
@@ -36,7 +35,7 @@ MEALgorithm is a modern, AI-enhanced nutrition tracking application designed to 
 - **Language**: TypeScript
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
 - **Database & Auth**: [Supabase](https://supabase.com/)
-- **AI Model**: [Google Gemini Pro Vision](https://ai.google.dev/)
+- **AI Model**: [Google Gemini 2.5 Flash](https://ai.google.dev/)
 - **State Management**: React Hooks + Server Actions
 
 ## 🚀 Getting Started
