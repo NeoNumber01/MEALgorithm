@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+
 interface CalorieGaugeProps {
     current: number
     target: number
@@ -7,87 +9,117 @@ interface CalorieGaugeProps {
 }
 
 export default function CalorieGauge({ current, target, label = "Today's Calories" }: CalorieGaugeProps) {
-    const percentage = Math.min(150, (current / target) * 100) // Cap at 150% for display
-    const displayPercent = Math.round((current / target) * 100)
+    // Animation state
+    const [animatedPercentage, setAnimatedPercentage] = useState(0)
 
-    // Calculate the angle for the needle (from -135 to 135 degrees = 270 degree arc)
-    const angle = -135 + (percentage / 150) * 270
+    useEffect(() => {
+        // Simple entry animation
+        const percentage = Math.min(100, (current / target) * 100)
+        const timer = setTimeout(() => {
+            setAnimatedPercentage(percentage)
+        }, 100)
+        return () => clearTimeout(timer)
+    }, [current, target])
 
-    // Color based on percentage
-    const getColor = () => {
-        if (percentage < 70) return '#22c55e' // Green - under
-        if (percentage < 90) return '#eab308' // Yellow - approaching
-        if (percentage <= 110) return '#22c55e' // Green - on target
-        if (percentage <= 130) return '#f97316' // Orange - slightly over
-        return '#ef4444' // Red - over
+    const percentage = Math.min(100, (current / target) * 100)
+    // SVG properties
+    // SVG properties
+    const radius = 80
+    const strokeWidth = 12
+
+    // We want a 220-degree arc, from -200deg to -20deg? Or symmetric opening at bottom.
+    // Let's do a symmetric arc open at the bottom.
+    // Length of the arc
+    const arcLength = Math.PI * radius // Semi-circle for now (180 deg) to keep it simple but refine the look
+    // A standard semi-circle is 180 degrees. Let's stick to the semi-circle layout but make it look premium.
+
+    // Calculate color based on percentage
+    const getStatusColor = () => {
+        if (percentage > 110) return "text-red-500"
+        if (percentage > 90) return "text-lime-500" // On target
+        return "text-cyan-600" // In progress
     }
 
-    const color = getColor()
+    const statusColorClass = getStatusColor()
 
     return (
-        <div className="relative w-full max-w-xs mx-auto">
-            {/* Gauge Background */}
-            <svg viewBox="0 0 200 120" className="w-full">
-                {/* Background arc */}
-                <path
-                    d="M 20 100 A 80 80 0 0 1 180 100"
-                    fill="none"
-                    stroke="#e5e7eb"
-                    strokeWidth="16"
-                    strokeLinecap="round"
-                />
+        <div className="relative w-full max-w-xs mx-auto flex flex-col items-center justify-center">
+            <div className="relative w-full aspect-[2/1.2] flex items-end justify-center">
+                <svg viewBox="0 0 200 110" className="w-full h-full overflow-visible">
+                    {/* Definitions for Gradients and Glows */}
+                    <defs>
+                        {/* The main progress gradient */}
+                        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor="#06b6d4" />   {/* Cyan-500 */}
+                            <stop offset="50%" stopColor="#3b82f6" />   {/* Blue-500 */}
+                            <stop offset="100%" stopColor="#84cc16" />  {/* Lime-500 */}
+                        </linearGradient>
 
-                {/* Colored progress arc - using gradient stops */}
-                <defs>
-                    <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#22c55e" />
-                        <stop offset="50%" stopColor="#eab308" />
-                        <stop offset="75%" stopColor="#f97316" />
-                        <stop offset="100%" stopColor="#ef4444" />
-                    </linearGradient>
-                </defs>
+                        {/* Soft Glow Filter */}
+                        <filter id="glow-shadow" x="-50%" y="-50%" width="200%" height="200%">
+                            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+                            <feMerge>
+                                <feMergeNode in="coloredBlur" />
+                                <feMergeNode in="SourceGraphic" />
+                            </feMerge>
+                        </filter>
+                    </defs>
 
-                {/* Progress arc */}
-                <path
-                    d="M 20 100 A 80 80 0 0 1 180 100"
-                    fill="none"
-                    stroke="url(#gaugeGradient)"
-                    strokeWidth="16"
-                    strokeLinecap="round"
-                    strokeDasharray={`${(percentage / 150) * 251.2} 251.2`}
-                />
-
-                {/* Needle */}
-                <g transform={`rotate(${angle}, 100, 100)`}>
-                    <line
-                        x1="100"
-                        y1="100"
-                        x2="100"
-                        y2="35"
-                        stroke={color}
-                        strokeWidth="3"
+                    {/* Background Track */}
+                    <path
+                        d="M 20 100 A 80 80 0 0 1 180 100"
+                        fill="none"
+                        stroke="#e2e8f0" // Slate-200
+                        strokeWidth={strokeWidth}
                         strokeLinecap="round"
+                        className="opacity-50"
                     />
-                    <circle cx="100" cy="100" r="8" fill={color} />
-                    <circle cx="100" cy="100" r="4" fill="white" />
-                </g>
 
-                {/* Scale labels */}
-                <text x="15" y="115" fontSize="10" fill="#9ca3af">0</text>
-                <text x="90" y="20" fontSize="10" fill="#9ca3af">Target</text>
-                <text x="175" y="115" fontSize="10" fill="#9ca3af">150%</text>
-            </svg>
+                    {/* Progress Arc */}
+                    <path
+                        d="M 20 100 A 80 80 0 0 1 180 100"
+                        fill="none"
+                        stroke="url(#progressGradient)"
+                        strokeWidth={strokeWidth}
+                        strokeLinecap="round"
+                        strokeDasharray={arcLength}
+                        strokeDashoffset={arcLength - (animatedPercentage / 100) * arcLength}
+                        filter="url(#glow-shadow)"
+                        className="transition-all duration-1000 ease-out"
+                        style={{
+                            transitionProperty: 'stroke-dashoffset',
+                        }}
+                    />
 
-            {/* Center display */}
-            <div className="absolute bottom-0 left-0 right-0 text-center pb-2">
-                <div className="text-4xl font-bold" style={{ color }}>
-                    {current.toLocaleString()}
-                </div>
-                <div className="text-sm text-gray-500">
-                    / {target.toLocaleString()} kcal
-                </div>
-                <div className="text-xs text-gray-400 mt-1">
-                    {label} • {displayPercent}%
+                    {/* Tick Marks (Optional Decoration) */}
+                    <g className="opacity-30">
+                        <line x1="20" y1="100" x2="30" y2="100" stroke="currentColor" strokeWidth="2" />
+                        <line x1="180" y1="100" x2="170" y2="100" stroke="currentColor" strokeWidth="2" />
+                        <line x1="100" y1="20" x2="100" y2="30" stroke="currentColor" strokeWidth="2" />
+                    </g>
+                </svg>
+
+                {/* Center Content Overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-end pb-0">
+                    {/* Goal Label */}
+                    <div className="text-xs font-semibold text-gray-400 tracking-wider uppercase mb-1">
+                        {label}
+                    </div>
+
+                    {/* Main Number */}
+                    <div className={`text-5xl font-extrabold tracking-tight ${statusColorClass} drop-shadow-sm`}>
+                        {current.toLocaleString()}
+                    </div>
+
+                    {/* Subtext */}
+                    <div className="flex items-center gap-2 mt-2 mb-1">
+                        <span className="text-sm font-medium text-gray-400">
+                            / {target.toLocaleString()} kcal
+                        </span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 ${statusColorClass}`}>
+                            {Math.round(percentage)}%
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
