@@ -1,0 +1,130 @@
+import SwiftUI
+import PhotosUI
+
+// MARK: - Meal Log View Model
+/// Manages meal logging flow: input → AI analysis → save
+@MainActor
+final class MealLogViewModel: ObservableObject {
+    // MARK: - Published Properties
+    @Published var step: Step = .input
+    @Published var inputMode: InputMode = .text
+    @Published var textInput: String = ""
+    @Published var selectedImage: UIImage?
+    @Published var selectedPhotoItem: PhotosPickerItem?
+    @Published var mealType: MealType = .lunch
+    @Published var mealDate: Date = Date()
+    @Published var analysis: MealAnalysis?
+    @Published var isAnalyzing = false
+    @Published var isSaving = false
+    @Published var error: String?
+    
+    enum Step {
+        case input
+        case preview
+        case saving
+        case done
+    }
+    
+    enum InputMode {
+        case text
+        case image
+    }
+    
+    // MARK: - Services
+    private let geminiService = GeminiService()
+    private let mealService = MealService()
+    
+    // MARK: - Analyze Meal
+    /// Send input to Gemini for analysis
+    func analyzeMeal() async {
+        guard inputMode == .text ? !textInput.isEmpty : selectedImage != nil else {
+            error = "Please provide a description or image"
+            return
+        }
+        
+        isAnalyzing = true
+        error = nil
+        step = .preview
+        
+        do {
+            let result = try await geminiService.analyzeMeal(
+                text: inputMode == .text ? textInput : nil,
+                image: inputMode == .image ? selectedImage : nil
+            )
+            self.analysis = result
+        } catch {
+            self.error = error.localizedDescription
+            step = .input
+        }
+        
+        isAnalyzing = false
+    }
+    
+    // MARK: - Save Meal
+    /// Save the analyzed meal to Supabase
+    func saveMeal() async {
+        guard let analysis = analysis else { return }
+        
+        isSaving = true
+        step = .saving
+        error = nil
+        
+        do {
+            var imagePath: String?
+            
+            // Upload image if present
+            if let image = selectedImage,
+               let imageData = image.jpegData(compressionQuality: 0.8) {
+                imagePath = try await mealService.uploadMealImage(imageData)
+            }
+            
+            // Save meal
+            try await mealService.saveMeal(
+                textContent: inputMode == .text ? textInput : nil,
+                imagePath: imagePath,
+                analysis: analysis,
+                mealType: mealType,
+                createdAt: mealDate
+            )
+            
+            step = .done
+        } catch {
+            self.error = error.localizedDescription
+            step = .preview
+        }
+        
+        isSaving = false
+    }
+    
+    // MARK: - Reset
+    /// Reset for new meal entry
+    func reset() {
+        step = .input
+        textInput = ""
+        selectedImage = nil
+        selectedPhotoItem = nil
+        mealType = .lunch
+        mealDate = Date()
+        analysis = nil
+        error = nil
+    }
+    
+    // MARK: - Go Back
+    func goBack() {
+        step = .input
+    }
+    
+    // MARK: - Handle Photo Selection
+    func handlePhotoSelection(_ item: PhotosPickerItem?) async {
+        guard let item = item else { return }
+        
+        do {
+            if let data = try await item.loadTransferable(type: Data.self),
+               let image = UIImage(data: data) {
+                selectedImage = image
+            }
+        } catch {
+            self.error = "Failed to load image"
+        }
+    }
+}

@@ -46,3 +46,28 @@ venv/
 
 # Supabase
 supabase/functions/*/deno.lock
+
+# iOS / Xcode
+**/Secrets.xcconfig
+*.xcuserstate
+xcuserdata/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+Pods/
+.build/
+*.xcworkspacedata
+
+# iOS build logs
+**/Build\ (Automatic)*.txt
+
+# iOS backup (temporary)
+MEALgorithmiOS_backup/
+
+# iOS Tests (per user requirement)
+MEALgorithmiOSTests/
+
+# Learning documentation (per user requirement)
+docs/learning_notes/
+
