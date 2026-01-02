@@ -3,12 +3,24 @@
 import { useEffect, useState } from 'react'
 import { getDailyStats, getWeeklyStats, getUserProfile } from '@/lib/dashboard/actions'
 import { generateGoalFeedback } from '@/lib/dashboard/ai-feedback'
+import { getCachedFeedback, updateCachedFeedback } from '@/lib/profile/actions'
+import { getNutritionalTargets } from '@/lib/nutrition/calculator'
+import { deleteMeal } from '@/lib/meals/actions'
+import CalorieGauge from './CalorieGauge'
+import Link from 'next/link'
 
 type ViewMode = 'today' | 'week'
 
 interface DailyData {
     date: string
     label: string
+    calories: number
+    protein: number
+    carbs: number
+    fat: number
+}
+
+interface NutritionTargets {
     calories: number
     protein: number
     carbs: number
@@ -29,7 +41,13 @@ export default function DashboardContent() {
         averages: { calories: number; protein: number; carbs: number; fat: number }
     } | null>(null)
     const [feedback, setFeedback] = useState<string>('')
-    const [targetCalories, setTargetCalories] = useState(2000)
+    const [targets, setTargets] = useState<NutritionTargets>({
+        calories: 2000,
+        protein: 150,
+        carbs: 200,
+        fat: 65,
+    })
+    const [deletingId, setDeletingId] = useState<string | null>(null)
 
     useEffect(() => {
         loadData()
@@ -39,10 +57,11 @@ export default function DashboardContent() {
         setLoading(true)
 
         const today = new Date().toISOString().split('T')[0]
-        const [dailyResult, weeklyResult, profileResult] = await Promise.all([
+        const [dailyResult, weeklyResult, profileResult, cachedResult] = await Promise.all([
             getDailyStats(today),
             getWeeklyStats(),
             getUserProfile(),
+            getCachedFeedback(),
         ])
 
         if (!('error' in dailyResult)) {
@@ -60,150 +79,314 @@ export default function DashboardContent() {
             })
         }
 
+        // Calculate targets from profile
         if (!('error' in profileResult) && profileResult.profile) {
-            setTargetCalories(profileResult.profile.calorie_target || 2000)
+            const calculatedTargets = getNutritionalTargets(profileResult.profile)
+            setTargets(calculatedTargets)
         }
 
-        // Generate AI feedback
-        if (!('error' in dailyResult) && !('error' in weeklyResult)) {
+        // Check if we should use cached feedback or generate new
+        let shouldGenerateFeedback = true
+
+        if (!('error' in cachedResult) && cachedResult.feedback) {
+            const lastMealTime = cachedResult.lastMealAt ? new Date(cachedResult.lastMealAt).getTime() : 0
+            const feedbackTime = cachedResult.updatedAt ? new Date(cachedResult.updatedAt).getTime() : 0
+
+            // Use cached feedback if it's newer than the last meal
+            if (feedbackTime > lastMealTime) {
+                setFeedback(cachedResult.feedback)
+                shouldGenerateFeedback = false
+            }
+        }
+
+        // Generate new AI feedback only if needed
+        if (shouldGenerateFeedback && !('error' in dailyResult) && !('error' in weeklyResult)) {
             const feedbackResult = await generateGoalFeedback({
                 todayCalories: dailyResult.totals.calories,
                 weeklyAvgCalories: weeklyResult.averages.calories,
-                targetCalories: profileResult.profile?.calorie_target || 2000,
+                targetCalories: targets.calories,
                 goalDescription: profileResult.profile?.goal_description,
             })
             setFeedback(feedbackResult.feedback)
+
+            // Cache the new feedback
+            await updateCachedFeedback(feedbackResult.feedback)
         }
 
         setLoading(false)
     }
 
+    const handleDelete = async (mealId: string) => {
+        if (!confirm('Are you sure you want to delete this meal?')) return
+
+        setDeletingId(mealId)
+        const result = await deleteMeal(mealId)
+
+        if (result?.success) {
+            // Reload data to reflect changes
+            const today = new Date().toISOString().split('T')[0]
+            const dailyResult = await getDailyStats(today)
+            if (!('error' in dailyResult)) {
+                setTodayData({
+                    totals: dailyResult.totals,
+                    meals: dailyResult.meals,
+                })
+            }
+        } else {
+            alert('Failed to delete meal')
+        }
+        setDeletingId(null)
+    }
+
     const currentData = viewMode === 'today' ? todayData?.totals : weeklyData?.averages
-    const caloriePercent = currentData ? Math.min(100, (currentData.calories / targetCalories) * 100) : 0
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center py-20">
-                <div className="animate-spin text-4xl">⏳</div>
+            <div className="flex flex-col items-center justify-center py-20">
+                <div className="relative">
+                    <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin border-t-purple-600" />
+                </div>
+                <p className="mt-4 text-gray-500">Loading your nutrition data...</p>
             </div>
         )
     }
 
     return (
         <div className="space-y-6">
-            {/* View Toggle */}
-            <div className="flex gap-2 bg-gray-100 p-1 rounded-lg w-fit">
-                <button
-                    onClick={() => setViewMode('today')}
-                    className={`px-4 py-2 rounded-md font-medium transition ${viewMode === 'today' ? 'bg-white shadow' : 'text-gray-600'
-                        }`}
-                >
-                    Today
-                </button>
-                <button
-                    onClick={() => setViewMode('week')}
-                    className={`px-4 py-2 rounded-md font-medium transition ${viewMode === 'week' ? 'bg-white shadow' : 'text-gray-600'
-                        }`}
-                >
-                    This Week
-                </button>
+            {/* Header with Toggle */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">
+                        {viewMode === 'today' ? "Today's Overview" : 'Weekly Summary'}
+                    </h1>
+                    <p className="text-gray-500 text-sm">
+                        {viewMode === 'today'
+                            ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+                            : 'Your last 7 days'
+                        }
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <div className="flex bg-gray-100 p-1 rounded-xl">
+                        <button
+                            onClick={() => setViewMode('today')}
+                            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${viewMode === 'today'
+                                ? 'bg-white shadow-sm text-gray-900'
+                                : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                        >
+                            📅 Today
+                        </button>
+                        <button
+                            onClick={() => setViewMode('week')}
+                            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${viewMode === 'week'
+                                ? 'bg-white shadow-sm text-gray-900'
+                                : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                        >
+                            📊 Week
+                        </button>
+                    </div>
+                    <Link
+                        href="/settings"
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                        title="Settings"
+                    >
+                        ⚙️
+                    </Link>
+                </div>
             </div>
 
-            {/* Calorie Progress */}
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-6 text-white">
-                <div className="flex justify-between items-start mb-4">
-                    <div>
-                        <p className="text-sm opacity-80">{viewMode === 'today' ? "Today's" : 'Daily Avg'} Calories</p>
-                        <p className="text-4xl font-bold">{currentData?.calories || 0}</p>
-                        <p className="text-sm opacity-80">/ {targetCalories} kcal target</p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-3xl font-bold">{Math.round(caloriePercent)}%</p>
-                    </div>
-                </div>
-                <div className="bg-white/30 rounded-full h-3">
-                    <div
-                        className="bg-white rounded-full h-3 transition-all duration-500"
-                        style={{ width: `${caloriePercent}%` }}
-                    />
-                </div>
+            {/* Calorie Gauge Card */}
+            <div className="bg-white/15 backdrop-blur-3xl rounded-3xl border border-white/20 shadow-2xl p-8 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:bg-white/20">
+                <CalorieGauge
+                    current={currentData?.calories || 0}
+                    target={targets.calories}
+                    label={viewMode === 'today' ? "Today's Calories" : 'Daily Average'}
+                />
             </div>
 
-            {/* Macros Grid */}
-            <div className="grid grid-cols-3 gap-4">
-                <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
-                    <div className="text-3xl font-bold text-red-600">
-                        {currentData?.protein || 0}g
+            {/* Macro Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Protein */}
+                <div className="relative overflow-hidden bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl p-6 text-white shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                    <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="text-2xl">🥩</span>
+                            <span className="text-sm font-medium opacity-90">Protein</span>
+                        </div>
+                        <div className="text-4xl font-bold mb-1">
+                            {currentData?.protein || 0}g
+                        </div>
+                        <div className="text-sm opacity-75 mb-3">of {targets.protein}g target</div>
+                        <div className="bg-white/20 rounded-full h-2">
+                            <div
+                                className="bg-white rounded-full h-2 transition-all duration-500"
+                                style={{ width: `${Math.min(100, ((currentData?.protein || 0) / targets.protein) * 100)}%` }}
+                            />
+                        </div>
+                        <div className="text-xs mt-2 opacity-75">
+                            {Math.round(((currentData?.protein || 0) / targets.protein) * 100)}% complete
+                        </div>
                     </div>
-                    <div className="text-sm text-gray-600">Protein</div>
                 </div>
-                <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-4 text-center">
-                    <div className="text-3xl font-bold text-yellow-600">
-                        {currentData?.carbs || 0}g
+
+                {/* Carbs */}
+                <div className="relative overflow-hidden bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-6 text-white shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                    <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="text-2xl">🍞</span>
+                            <span className="text-sm font-medium opacity-90">Carbs</span>
+                        </div>
+                        <div className="text-4xl font-bold mb-1">
+                            {currentData?.carbs || 0}g
+                        </div>
+                        <div className="text-sm opacity-75 mb-3">of {targets.carbs}g target</div>
+                        <div className="bg-white/20 rounded-full h-2">
+                            <div
+                                className="bg-white rounded-full h-2 transition-all duration-500"
+                                style={{ width: `${Math.min(100, ((currentData?.carbs || 0) / targets.carbs) * 100)}%` }}
+                            />
+                        </div>
+                        <div className="text-xs mt-2 opacity-75">
+                            {Math.round(((currentData?.carbs || 0) / targets.carbs) * 100)}% complete
+                        </div>
                     </div>
-                    <div className="text-sm text-gray-600">Carbs</div>
                 </div>
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-center">
-                    <div className="text-3xl font-bold text-blue-600">
-                        {currentData?.fat || 0}g
+
+                {/* Fat */}
+                <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                    <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="text-2xl">🧈</span>
+                            <span className="text-sm font-medium opacity-90">Fat</span>
+                        </div>
+                        <div className="text-4xl font-bold mb-1">
+                            {currentData?.fat || 0}g
+                        </div>
+                        <div className="text-sm opacity-75 mb-3">of {targets.fat}g target</div>
+                        <div className="bg-white/20 rounded-full h-2">
+                            <div
+                                className="bg-white rounded-full h-2 transition-all duration-500"
+                                style={{ width: `${Math.min(100, ((currentData?.fat || 0) / targets.fat) * 100)}%` }}
+                            />
+                        </div>
+                        <div className="text-xs mt-2 opacity-75">
+                            {Math.round(((currentData?.fat || 0) / targets.fat) * 100)}% complete
+                        </div>
                     </div>
-                    <div className="text-sm text-gray-600">Fat</div>
                 </div>
             </div>
 
             {/* AI Feedback */}
             {feedback && (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                    <h3 className="font-semibold text-green-800 mb-2">🤖 AI Coach Says:</h3>
-                    <p className="text-green-700">{feedback}</p>
+                <div className="relative overflow-hidden bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-lg">
+                    <div className="absolute -right-4 -bottom-4 text-8xl opacity-10">🤖</div>
+                    <div className="relative flex gap-4">
+                        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl flex items-center justify-center text-2xl shadow-lg">
+                            🤖
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-emerald-800 mb-1">AI Coach Insight</h3>
+                            <p className="text-emerald-700 leading-relaxed">{feedback}</p>
+                        </div>
+                    </div>
                 </div>
             )}
 
             {/* Weekly Chart (if week view) */}
             {viewMode === 'week' && weeklyData && (
-                <div className="bg-white border rounded-xl p-6">
-                    <h3 className="font-semibold mb-4">Weekly Overview</h3>
-                    <div className="flex items-end justify-between h-32 gap-2">
+                <div className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-3xl p-6 shadow-xl transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:bg-white/20">
+                    <h3 className="font-bold text-gray-900 mb-6">📈 Weekly Calorie Intake</h3>
+                    <div className="flex items-end justify-between h-40 gap-3">
                         {weeklyData.days.map((day) => {
-                            const height = targetCalories > 0
-                                ? Math.min(100, (day.calories / targetCalories) * 100)
+                            const percentage = targets.calories > 0
+                                ? Math.min(100, (day.calories / targets.calories) * 100)
                                 : 0
+                            const isToday = day.date === new Date().toISOString().split('T')[0]
+
                             return (
-                                <div key={day.date} className="flex-1 flex flex-col items-center">
-                                    <div className="w-full bg-gray-100 rounded-t relative" style={{ height: '100px' }}>
-                                        <div
-                                            className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all"
-                                            style={{ height: `${height}%` }}
-                                        />
+                                <div key={day.date} className="flex-1 flex flex-col items-center group">
+                                    <div className="text-xs font-medium text-gray-500 mb-1 opacity-0 group-hover:opacity-100 transition">
+                                        {day.calories} kcal
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-2">{day.label}</p>
-                                    <p className="text-xs font-medium">{day.calories}</p>
+                                    <div className="w-full bg-gray-100 rounded-xl relative" style={{ height: '120px' }}>
+                                        <div
+                                            className={`absolute bottom-0 w-full rounded-xl transition-all duration-500 ${isToday
+                                                ? 'bg-gradient-to-t from-purple-500 to-pink-400'
+                                                : 'bg-gradient-to-t from-blue-500 to-cyan-400'
+                                                }`}
+                                            style={{ height: `${percentage}%` }}
+                                        />
+                                        {percentage >= 100 && (
+                                            <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-sm">🎯</div>
+                                        )}
+                                    </div>
+                                    <p className={`text-xs mt-2 font-medium ${isToday ? 'text-purple-600' : 'text-gray-500'}`}>
+                                        {day.label}
+                                    </p>
                                 </div>
                             )
                         })}
                     </div>
+                    <div className="mt-4 pt-4 border-t flex justify-between text-sm text-gray-500">
+                        <span>Target line: {targets.calories} kcal</span>
+                        <span>Weekly avg: {weeklyData.averages.calories} kcal</span>
+                    </div>
                 </div>
             )}
 
-            {/* Today's Meals (if today view) */}
+            {/* Today's Meals */}
             {viewMode === 'today' && todayData && todayData.meals.length > 0 && (
-                <div className="bg-white border rounded-xl p-6">
-                    <h3 className="font-semibold mb-4">Today&apos;s Meals</h3>
+                <div className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-3xl p-6 shadow-xl transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:bg-white/20">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-gray-900">🍽️ Today&apos;s Meals</h3>
+                        <Link href="/log" className="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                            + Add meal
+                        </Link>
+                    </div>
                     <div className="space-y-3">
-                        {todayData.meals.map((meal) => (
-                            <div key={meal.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                                <div>
-                                    <span className="capitalize font-medium">{meal.mealType || 'Meal'}</span>
-                                    <span className="text-gray-500 text-sm ml-2">
-                                        {new Date(meal.createdAt).toLocaleTimeString('en-US', {
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                        })}
-                                    </span>
+                        {todayData.meals.map((meal, index) => (
+                            <div
+                                key={meal.id}
+                                className="flex justify-between items-center p-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl hover:bg-white/10 transition-all group"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center text-lg">
+                                        {index === 0 ? '🌅' : index === 1 ? '☀️' : index === 2 ? '🌙' : '🍿'}
+                                    </div>
+                                    <div>
+                                        <span className="capitalize font-semibold text-gray-900">
+                                            {meal.mealType || 'Meal'}
+                                        </span>
+                                        <div className="text-gray-400 text-xs">
+                                            {new Date(meal.createdAt).toLocaleTimeString('en-US', {
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
-                                <span className="font-semibold text-orange-600">
-                                    {meal.analysis?.summary?.calories || 0} kcal
-                                </span>
+                                <div className="flex items-center gap-4">
+                                    <div className="text-right">
+                                        <span className="font-bold text-lg text-orange-600">
+                                            {meal.analysis?.summary?.calories || 0}
+                                        </span>
+                                        <span className="text-gray-400 text-sm ml-1">kcal</span>
+                                    </div>
+                                    <button
+                                        onClick={() => handleDelete(meal.id)}
+                                        disabled={deletingId === meal.id}
+                                        className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 transition-all disabled:opacity-50"
+                                        title="Delete meal"
+                                    >
+                                        {deletingId === meal.id ? '...' : '🗑️'}
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -212,10 +395,16 @@ export default function DashboardContent() {
 
             {/* Empty State */}
             {viewMode === 'today' && todayData && todayData.meals.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                    <p className="text-4xl mb-2">🍽️</p>
-                    <p>No meals logged today yet.</p>
-                    <a href="/log" className="text-blue-600 hover:underline">Log your first meal →</a>
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-100 rounded-2xl p-12 text-center">
+                    <div className="text-6xl mb-4">🍽️</div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">No meals logged yet</h3>
+                    <p className="text-gray-500 mb-6">Start tracking your nutrition today!</p>
+                    <Link
+                        href="/log"
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition-all hover:-translate-y-0.5"
+                    >
+                        📝 Log your meal
+                    </Link>
                 </div>
             )}
         </div>

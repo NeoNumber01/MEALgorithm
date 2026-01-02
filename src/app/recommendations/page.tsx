@@ -11,19 +11,25 @@ export default async function RecommendationsPage() {
     }
 
     return (
-        <main className="min-h-screen bg-gray-50">
-            <div className="max-w-4xl mx-auto px-4 py-8">
-                <div className="flex justify-between items-center mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Meal Suggestions</h1>
-                        <p className="text-gray-600">AI-powered recommendations based on your goals</p>
+        <main className="min-h-screen relative overflow-hidden bg-gradient-to-br from-gray-50 via-white to-green-50">
+            {/* Background Watermark */}
+            <div
+                className="absolute inset-0 opacity-20 pointer-events-none"
+                style={{ backgroundImage: "url('/images/suggestions-bg.png')", backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
+            />
+
+            <div className="relative max-w-5xl mx-auto px-4 py-8">
+                {/* Header */}
+                <div className="text-center mb-8">
+                    <div className="inline-flex items-center gap-2 bg-gradient-to-r from-green-100 to-teal-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium mb-4">
+                        <span className="text-lg">💡</span> Powered by Gemini AI
                     </div>
-                    <a
-                        href="/dashboard"
-                        className="text-blue-600 hover:underline"
-                    >
-                        ← Back to Dashboard
-                    </a>
+                    <h1 className="text-4xl font-extrabold text-gray-900 mb-3">
+                        Meal Suggestions
+                    </h1>
+                    <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                        Personalized recommendations based on your goals, preferences, and eating history
+                    </p>
                 </div>
 
                 <RecommendationsContent />

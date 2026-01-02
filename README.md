@@ -5,10 +5,12 @@ A full-stack nutrition tracking application built with **Next.js 14**, **Supabas
 ## Features
 
 - 🔐 **Authentication**: OAuth login via Google/GitHub using Supabase Auth
-- 📝 **Meal Logging**: Log meals via text description or photo upload
-- 🤖 **AI Analysis**: Gemini 2.0 Flash parses meals into structured nutritional data
-- 📊 **Dashboard**: View daily/weekly calorie and macro summaries
+- 📝 **Smart Logging**: Log meals via text description or photo upload
+- 🗑️ **Management**: Edit and delete your meal logs seamlessly
+- 🤖 **AI Analysis**: **Gemini 2.5 Flash** parses meals into structured nutritional data
+- 📊 **Dashboard**: View daily/weekly calorie and macro summaries with interactive charts
 - 💡 **AI Recommendations**: Get personalized meal suggestions based on your goals
+- 🎨 **Modern UI**: Featuring an **Ultra-Thin Glassmorphism** design system with dynamic 3D hover effects and animated backgrounds
 
 ## Tech Stack
 
@@ -88,17 +90,18 @@ src/
 │   ├── dashboard/          # Dashboard page
 │   ├── log/                # Meal logging page
 │   ├── login/              # Login page
-│   └── recommendations/    # AI recommendations page
+│   ├── recommendations/    # AI recommendations page
+│   └── settings/           # User profile settings
 ├── components/
 │   ├── auth/               # Auth components
 │   ├── dashboard/          # Dashboard components
 │   ├── meals/              # Meal logging components
+│   ├── profile/            # Profile settings components
 │   └── recommendations/    # Recommendation components
 ├── lib/
 │   ├── ai/                 # Gemini client, prompts, schemas
 │   ├── dashboard/          # Dashboard actions
 │   ├── meals/              # Meal CRUD actions
-│   ├── recommendations/    # Recommendation actions
 │   └── supabase/           # Supabase clients
 └── types/                  # TypeScript types
 
@@ -119,12 +122,18 @@ supabase/
 - Click "Analyze with AI" to get nutritional breakdown
 - Review the preview and click "Confirm & Save"
 
-### 3. View Dashboard
+### 3. Manage Your Logic
+- View your daily logs on the Dashboard
+- Hover over any meal item to reveal the **Delete (🗑️)** button
+- Confirm deletion to remove it from your records
+
+### 4. View Dashboard
 - Click "Dashboard" to see your nutrition summary
 - Toggle between "Today" and "This Week" views
 - See AI-generated feedback on your progress
+- Watch the calorie gauge and macro cards animate with your data
 
-### 4. Get Recommendations
+### 5. Get Recommendations
 - Click "Suggestions" for AI-powered meal ideas
 - Recommendations are personalized based on your goals and recent meals
 

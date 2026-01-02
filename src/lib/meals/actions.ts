@@ -30,6 +30,12 @@ export async function saveMeal(data: {
         return { error: error.message }
     }
 
+    // Update last_meal_at to invalidate cached feedback
+    await supabase
+        .from('profiles')
+        .update({ last_meal_at: new Date().toISOString() })
+        .eq('id', user.id)
+
     revalidatePath('/dashboard')
     return { success: true }
 }
@@ -65,4 +71,27 @@ export async function uploadMealImage(formData: FormData) {
         .getPublicUrl(fileName)
 
     return { path: fileName, url: urlData.publicUrl }
+}
+
+export async function deleteMeal(mealId: string) {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+        return { error: 'Not authenticated' }
+    }
+
+    const { error } = await supabase
+        .from('meals')
+        .delete()
+        .eq('id', mealId)
+        .eq('user_id', user.id)
+
+    if (error) {
+        console.error('Error deleting meal:', error)
+        return { error: error.message }
+    }
+
+    revalidatePath('/dashboard')
+    return { success: true }
 }
