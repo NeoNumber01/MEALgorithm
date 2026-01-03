@@ -39,7 +39,6 @@ export interface Database {
                 Row: {
                     id: string
                     user_id: string
-                    image_path: string | null
                     text_content: string | null
                     analysis: Json | null
                     meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null
@@ -48,7 +47,6 @@ export interface Database {
                 Insert: {
                     id?: string
                     user_id: string
-                    image_path?: string | null
                     text_content?: string | null
                     analysis?: Json | null
                     meal_type?: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null
@@ -57,7 +55,6 @@ export interface Database {
                 Update: {
                     id?: string
                     user_id?: string
-                    image_path?: string | null
                     text_content?: string | null
                     analysis?: Json | null
                     meal_type?: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null

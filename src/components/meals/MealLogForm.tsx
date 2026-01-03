@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { analyzeMeal } from '@/lib/ai/actions'
-import { saveMeal, uploadMealImage } from '@/lib/meals/actions'
+import { saveMeal } from '@/lib/meals/actions'
 import { MealAnalysis } from '@/lib/ai/schema'
 import { notifyDataUpdated } from '@/lib/cache-utils'
 
@@ -75,23 +75,9 @@ export default function MealLogForm() {
 
         setStep('saving')
 
-        let imagePath: string | undefined
-
-        if (imageFile) {
-            const uploadForm = new FormData()
-            uploadForm.append('image', imageFile)
-            const uploadResult = await uploadMealImage(uploadForm)
-            if ('error' in uploadResult) {
-                setError(uploadResult.error || 'Upload failed')
-                setStep('preview')
-                return
-            }
-            imagePath = uploadResult.path
-        }
-
+        // Images are only used for AI analysis and not stored
         const saveResult = await saveMeal({
             textContent: inputMode === 'text' ? textInput : undefined,
-            imagePath,
             analysis,
             mealType,
             createdAt: new Date(`${date}T${time}`).toISOString(),
@@ -208,7 +194,7 @@ export default function MealLogForm() {
                                     </label>
                                 )}
                             </div>
-                            
+
                             {/* Additional description input for photo mode */}
                             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-100">
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
