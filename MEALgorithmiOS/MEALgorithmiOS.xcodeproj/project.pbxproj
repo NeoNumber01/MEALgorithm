@@ -37,6 +37,9 @@
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		E70524502F087A00004CF2F3 /* Exceptions for "MEALgorithmiOS" folder in "MEALgorithmiOS" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			assetTagsByRelativePath = {
+				Resources/nutrition_info.json = (New, );
+			};
 			membershipExceptions = (
 				Config/Secrets.xcconfig,
 				Info.plist,
@@ -193,6 +196,9 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
+				KnownAssetTags = (
+					New,
+				);
 				LastSwiftUpdateCheck = 1630;
 				LastUpgradeCheck = 1630;
 				TargetAttributes = {
@@ -298,6 +304,8 @@
 /* Begin XCBuildConfiguration section */
 		E70523B52F0876E6004CF2F3 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = E70523982F0876E4004CF2F3 /* MEALgorithmiOS */;
+			baseConfigurationReferenceRelativePath = Config/Secrets.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -362,6 +370,8 @@
 		};
 		E70523B62F0876E6004CF2F3 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = E70523982F0876E4004CF2F3 /* MEALgorithmiOS */;
+			baseConfigurationReferenceRelativePath = Config/Secrets.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -419,6 +429,8 @@
 		};
 		E70523B82F0876E6004CF2F3 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = E70523982F0876E4004CF2F3 /* MEALgorithmiOS */;
+			baseConfigurationReferenceRelativePath = Config/Secrets.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -448,6 +460,8 @@
 		};
 		E70523B92F0876E6004CF2F3 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = E70523982F0876E4004CF2F3 /* MEALgorithmiOS */;
+			baseConfigurationReferenceRelativePath = Config/Secrets.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

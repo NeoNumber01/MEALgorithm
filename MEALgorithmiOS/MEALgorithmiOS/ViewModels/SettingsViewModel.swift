@@ -28,12 +28,52 @@ final class SettingsViewModel: ObservableObject {
     // User Info
     @Published var userEmail: String = ""
     
+    // MARK: - Change Tracking
+    private var initialSnapshot: ProfileSnapshot?
+    
     // MARK: - Services
     private let profileService = ProfileService()
     
     // MARK: - Computed Properties
     var hasPhysicalStats: Bool {
         heightCm != nil && weightKg != nil && age != nil
+    }
+    
+    /// Check if there are unsaved changes
+    var hasUnsavedChanges: Bool {
+        guard let initial = initialSnapshot else { return false }
+        return captureSnapshot() != initial
+    }
+    
+    // MARK: - Snapshot for Change Detection
+    private struct ProfileSnapshot: Equatable {
+        let heightCm: Int?
+        let weightKg: Double?
+        let age: Int?
+        let gender: Gender
+        let activityLevel: ActivityLevel
+        let goalDescription: String
+        let calorieTarget: Int
+        let proteinTarget: Int
+        let carbsTarget: Int
+        let fatTarget: Int
+        let useCustomTargets: Bool
+    }
+    
+    private func captureSnapshot() -> ProfileSnapshot {
+        ProfileSnapshot(
+            heightCm: heightCm,
+            weightKg: weightKg,
+            age: age,
+            gender: gender,
+            activityLevel: activityLevel,
+            goalDescription: goalDescription,
+            calorieTarget: calorieTarget,
+            proteinTarget: proteinTarget,
+            carbsTarget: carbsTarget,
+            fatTarget: fatTarget,
+            useCustomTargets: useCustomTargets
+        )
     }
     
     // MARK: - Load Profile
@@ -76,6 +116,9 @@ final class SettingsViewModel: ObservableObject {
         }
         
         isLoading = false
+        
+        // Capture initial state for change detection
+        initialSnapshot = captureSnapshot()
     }
     
     // MARK: - Recalculate Targets
@@ -102,6 +145,13 @@ final class SettingsViewModel: ObservableObject {
         proteinTarget = macros.protein
         carbsTarget = macros.carbs
         fatTarget = macros.fat
+    }
+    
+    // MARK: - Save Profile If Needed (Auto-save)
+    /// Only saves if there are actual changes - use for auto-save on view disappear
+    func saveProfileIfNeeded() async {
+        guard hasUnsavedChanges else { return }
+        await saveProfile()
     }
     
     // MARK: - Save Profile
@@ -133,6 +183,12 @@ final class SettingsViewModel: ObservableObject {
         do {
             try await profileService.updateProfile(update)
             saveSuccess = true
+            
+            // Update snapshot after successful save
+            initialSnapshot = captureSnapshot()
+            
+            // Notify other views
+            NotificationCenter.default.post(name: .profileDidUpdate, object: nil)
             
             // Clear success after delay
             try? await Task.sleep(nanoseconds: 2_000_000_000)
