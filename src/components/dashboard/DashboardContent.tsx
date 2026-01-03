@@ -11,7 +11,7 @@ import Link from 'next/link'
 import MealDetailModal from './MealDetailModal'
 import StatisticsView from './StatisticsView'
 import ConfirmModal from '@/components/ui/ConfirmModal'
-import { notifyDataUpdated, getLastDataUpdateTime, CACHE_KEYS } from '@/lib/cache-utils'
+import { notifyDataUpdated, getLastDataUpdateTime, getLastGoalUpdateTime, generateDataHash, shouldRegenerateAIFeedback, CACHE_KEYS } from '@/lib/cache-utils'
 
 type ViewMode = 'today' | 'week'
 
@@ -135,21 +135,43 @@ export default function DashboardContent() {
             localStorage.setItem(CACHE_KEYS.DASHBOARD_TARGETS, JSON.stringify(calculatedTargets))
         }
 
-        // Always generate fresh AI feedback for today's view
+        // Smart AI feedback generation - only call AI when data actually changed
         if (!('error' in dailyResult) && !('error' in weeklyResult)) {
-            setFeedbackLoading(true)
-            const feedbackResult = await generateGoalFeedback({
+            // Create hash of current data used for feedback
+            const feedbackDataHash = generateDataHash({
                 todayCalories: dailyResult.totals.calories,
                 weeklyAvgCalories: weeklyResult.averages.calories,
                 targetCalories: calculatedTargets.calories,
                 goalDescription: profileResult.profile?.goal_description,
             })
-            setFeedback(feedbackResult.feedback)
-            setFeedbackLoading(false)
+            
+            // Get cached hash and feedback
+            const cachedHash = localStorage.getItem(CACHE_KEYS.DASHBOARD_FEEDBACK_HASH)
+            const cachedFeedback = localStorage.getItem(CACHE_KEYS.DASHBOARD_FEEDBACK)
+            const lastFeedbackTime = parseInt(localStorage.getItem(CACHE_KEYS.DASHBOARD_TIMESTAMP) || '0')
+            
+            // Check if we need to regenerate AI feedback
+            if (shouldRegenerateAIFeedback(feedbackDataHash, cachedHash, lastFeedbackTime)) {
+                console.log('AI Feedback: Data changed, regenerating...', { cachedHash, feedbackDataHash })
+                setFeedbackLoading(true)
+                const feedbackResult = await generateGoalFeedback({
+                    todayCalories: dailyResult.totals.calories,
+                    weeklyAvgCalories: weeklyResult.averages.calories,
+                    targetCalories: calculatedTargets.calories,
+                    goalDescription: profileResult.profile?.goal_description,
+                })
+                setFeedback(feedbackResult.feedback)
+                setFeedbackLoading(false)
 
-            // Cache the new feedback
-            await updateCachedFeedback(feedbackResult.feedback)
-            localStorage.setItem(CACHE_KEYS.DASHBOARD_FEEDBACK, feedbackResult.feedback)
+                // Cache the new feedback and hash
+                await updateCachedFeedback(feedbackResult.feedback)
+                localStorage.setItem(CACHE_KEYS.DASHBOARD_FEEDBACK, feedbackResult.feedback)
+                localStorage.setItem(CACHE_KEYS.DASHBOARD_FEEDBACK_HASH, feedbackDataHash)
+            } else if (cachedFeedback) {
+                // Use cached feedback - no AI call needed
+                console.log('AI Feedback: Using cached feedback (no data change)')
+                setFeedback(cachedFeedback)
+            }
         }
 
         setLoading(false)
@@ -402,7 +424,10 @@ export default function DashboardContent() {
                             >
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center text-lg">
-                                        {index === 0 ? '🌅' : index === 1 ? '☀️' : index === 2 ? '🌙' : '🍿'}
+                                        {meal.mealType === 'breakfast' ? '🌅' : 
+                                         meal.mealType === 'lunch' ? '☀️' : 
+                                         meal.mealType === 'dinner' ? '🌙' : 
+                                         meal.mealType === 'snack' ? '🍿' : '🍽️'}
                                     </div>
                                     <div>
                                         <span className="capitalize font-semibold text-gray-900">

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { getStatsForRange, getDailyStats, getUserProfile } from '@/lib/dashboard/actions'
 import { generateStatisticsInsight } from '@/lib/dashboard/ai-feedback'
-import { getLastDataUpdateTime } from '@/lib/cache-utils'
+import { getLastDataUpdateTime, getLastGoalUpdateTime, generateDataHash } from '@/lib/cache-utils'
 import DayDetailModal from './DayDetailModal'
 import MealDetailModal from './MealDetailModal'
 
@@ -122,9 +122,11 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
         // Cache key based on range and timestamps
         const cacheKeyData = `stats_data_${timeRange}_${start}_${end}`
         const cacheKeyInsight = `stats_insight_${timeRange}_${start}_${end}`
+        const cacheKeyInsightHash = `stats_insight_hash_${timeRange}_${start}_${end}`
 
         // Check cache validity against global last update
         const lastDbUpdate = getLastDataUpdateTime()
+        const lastGoalUpdate = getLastGoalUpdateTime()
 
         try {
             const cachedDataStr = localStorage.getItem(cacheKeyData)
@@ -134,9 +136,10 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
                 const { data, timestamp } = JSON.parse(cachedDataStr)
 
                 // Check if cache is newer than last DB update AND not too old (e.g. 24h)
-                if (timestamp > lastDbUpdate && (Date.now() - timestamp < 86400000)) {
+                if (timestamp > lastDbUpdate && timestamp > lastGoalUpdate && (Date.now() - timestamp < 86400000)) {
                     setStats(data)
                     if (cachedInsight) {
+                        console.log('Stats AI Insight: Using cached insight (no data change)')
                         setAiInsight(cachedInsight)
                     }
                     setLoading(false)
@@ -161,14 +164,14 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
             setStats(result)
 
             // Save to cache with timestamp
+            const cacheTimestamp = Date.now()
             localStorage.setItem(cacheKeyData, JSON.stringify({
                 data: result,
-                timestamp: Date.now()
+                timestamp: cacheTimestamp
             }))
 
-            // Generate AI insight after stats are loaded
+            // Generate AI insight only if data actually changed
             if (result.days.length > 0) {
-                setInsightLoading(true)
                 const currentOption = timeRangeOptions.find(o => o.value === timeRange)
                 const periodLabel = currentOption?.label || 'Selected Period'
 
@@ -188,24 +191,51 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
                     }
                 }
 
-                const insightResult = await generateStatisticsInsight({
-                    periodLabel,
+                // Create hash to check if data actually changed
+                const insightDataHash = generateDataHash({
                     totalDays: result.summary.totalDays,
                     daysWithMeals: result.summary.daysWithMeals,
                     totalMeals: result.summary.totalMeals,
                     avgCalories: result.averages.calories,
                     avgProtein: result.averages.protein,
-                    avgCarbs: result.averages.carbs,
-                    avgFat: result.averages.fat,
-                    targetCalories,
                     consistencyScore,
                     currentStreak,
+                    targetCalories,
                     goalDescription: !('error' in profileResult) ? profileResult.profile?.goal_description : undefined,
                 })
 
-                setAiInsight(insightResult.insight)
-                localStorage.setItem(cacheKeyInsight, insightResult.insight)
-                setInsightLoading(false)
+                const cachedInsightHash = localStorage.getItem(cacheKeyInsightHash)
+                const cachedInsight = localStorage.getItem(cacheKeyInsight)
+
+                // Only call AI if data actually changed
+                if (cachedInsightHash !== insightDataHash || !cachedInsight) {
+                    console.log('Stats AI Insight: Data changed, regenerating...', { cachedInsightHash, insightDataHash })
+                    setInsightLoading(true)
+                    
+                    const insightResult = await generateStatisticsInsight({
+                        periodLabel,
+                        totalDays: result.summary.totalDays,
+                        daysWithMeals: result.summary.daysWithMeals,
+                        totalMeals: result.summary.totalMeals,
+                        avgCalories: result.averages.calories,
+                        avgProtein: result.averages.protein,
+                        avgCarbs: result.averages.carbs,
+                        avgFat: result.averages.fat,
+                        targetCalories,
+                        consistencyScore,
+                        currentStreak,
+                        goalDescription: !('error' in profileResult) ? profileResult.profile?.goal_description : undefined,
+                    })
+
+                    setAiInsight(insightResult.insight)
+                    localStorage.setItem(cacheKeyInsight, insightResult.insight)
+                    localStorage.setItem(cacheKeyInsightHash, insightDataHash)
+                    setInsightLoading(false)
+                } else {
+                    // Use cached insight - no AI call needed
+                    console.log('Stats AI Insight: Using cached insight (hash match)')
+                    setAiInsight(cachedInsight)
+                }
             }
         }
         setLoading(false)
@@ -400,7 +430,7 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
             {insights && stats.days.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {/* Consistency Score */}
-                    <div className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-2xl p-5 shadow-lg hover:shadow-xl transition-shadow">
+                    <div className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-3xl">🎯</span>
                             <div className="relative w-14 h-14">
@@ -431,7 +461,7 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
                     </div>
 
                     {/* Current Streak */}
-                    <div className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-2xl p-5 shadow-lg hover:shadow-xl transition-shadow">
+                    <div className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-3xl">🔥</span>
                             <div className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
@@ -443,7 +473,7 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
                     </div>
 
                     {/* Best Day */}
-                    <div className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-2xl p-5 shadow-lg hover:shadow-xl transition-shadow">
+                    <div className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-3xl">⭐</span>
                             <div className="text-right">
@@ -456,7 +486,7 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
                     </div>
 
                     {/* Avg Protein/Meal */}
-                    <div className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-2xl p-5 shadow-lg hover:shadow-xl transition-shadow">
+                    <div className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-3xl">💪</span>
                             <div className="text-3xl font-bold text-red-500">{insights.avgProteinPerMeal}g</div>

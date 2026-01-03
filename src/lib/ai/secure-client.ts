@@ -1,13 +1,12 @@
 /**
  * Secure AI client for browser-side calls
  * 
- * SECURITY: This module calls the /api/ai route instead of directly
- * using the Gemini API key. The API key is never exposed to the client.
- * 
- * For most use cases, prefer using Server Actions (files with 'use server')
- * which are more efficient. Use this client only when you need to call
- * AI from client components.
+ * SECURITY: This module calls Supabase Edge Functions instead of directly
+ * using the Gemini API key. The API key is stored securely in Supabase
+ * and never exposed to the client.
  */
+
+import { createClient } from '@/lib/supabase/client'
 
 export type AIRequestType = 'meal-analysis' | 'recommendations' | 'feedback'
 
@@ -17,7 +16,7 @@ interface AIResponse<T = unknown> {
 }
 
 /**
- * Call the AI service through the secure API route
+ * Call the AI service through Supabase Edge Functions
  * @param prompt - The prompt to send to the AI
  * @param type - The type of request (for validation and rate limiting)
  * @returns The AI response data or error
@@ -27,10 +26,19 @@ export async function callAI<T = unknown>(
     type?: AIRequestType
 ): Promise<AIResponse<T>> {
     try {
-        const response = await fetch('/api/ai', {
+        const supabase = createClient()
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (!session) {
+            return { error: 'Unauthorized - please sign in' }
+        }
+
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const response = await fetch(`${supabaseUrl}/functions/v1/ai-generate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({ prompt, type }),
         })

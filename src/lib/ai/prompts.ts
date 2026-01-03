@@ -1,3 +1,12 @@
+/**
+ * @deprecated This file is no longer used.
+ * The system prompt has been moved to Supabase Edge Functions.
+ * 
+ * See: supabase/functions/analyze-meal/index.ts
+ * 
+ * This file is kept for reference only.
+ */
+
 export const SYSTEM_PROMPT = `
 You are an expert Nutritionist AI.
 Your task is to analyze the user's meal input (text or image) and output a structured nutritional analysis.

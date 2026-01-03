@@ -23,7 +23,7 @@ interface MealAnalysis {
 }
 
 export async function getDailyStats(start: string, end: string) {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not authenticated' }
@@ -73,7 +73,7 @@ export async function getDailyStats(start: string, end: string) {
 }
 
 export async function getWeeklyStats(start: string, end: string, timezoneOffset: number) {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not authenticated' }
@@ -162,7 +162,7 @@ export async function getWeeklyStats(start: string, end: string, timezoneOffset:
 }
 
 export async function getUserProfile() {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not authenticated' }
@@ -184,7 +184,7 @@ interface MealTypeStats {
 }
 
 export async function getStatsForRange(start: string, end: string, timezoneOffset: number) {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not authenticated' }

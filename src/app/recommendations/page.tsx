@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import RecommendationsContent from '@/components/recommendations/RecommendationsContent'
 
 export default async function RecommendationsPage() {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {

@@ -9,7 +9,7 @@ export async function saveMeal(data: {
     mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack'
     createdAt?: string
 }) {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
@@ -41,7 +41,7 @@ export async function saveMeal(data: {
 }
 
 export async function deleteMeal(mealId: string) {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {

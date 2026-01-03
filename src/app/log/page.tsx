@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import MealLogForm from '@/components/meals/MealLogForm'
 
 export default async function LogMealPage() {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {

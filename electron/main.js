@@ -43,7 +43,7 @@ function clearGPUCache() {
     try {
         const userDataPath = app.getPath('userData');
         const cacheDirs = ['GPUCache', 'DawnGraphiteCache', 'DawnWebGPUCache', 'Code Cache'];
-        
+
         for (const dir of cacheDirs) {
             const cachePath = path.join(userDataPath, dir);
             if (fs.existsSync(cachePath)) {
@@ -105,7 +105,7 @@ function createWindow() {
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
         },
-        icon: path.join(__dirname, '../public/favicon.ico'),
+        icon: path.join(__dirname, '../public/images/MEAL_icon.ico'),
     });
 
     // Remove the menu bar completely

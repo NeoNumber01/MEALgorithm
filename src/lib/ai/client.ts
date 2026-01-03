@@ -1,24 +1,12 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+/**
+ * @deprecated This file is no longer used.
+ * AI calls have been migrated to Supabase Edge Functions.
+ * 
+ * - Use `analyzeMeal` from `@/lib/ai/actions` for server-side meal analysis
+ * - Use `callAI` from `@/lib/ai/secure-client` for client-side AI calls
+ * 
+ * The Gemini API key is now stored securely in Supabase Edge Function secrets.
+ */
 
-// SECURITY: Ensure this module only runs on the server
-// This check prevents accidental client-side bundling of the API key
-if (typeof window !== 'undefined') {
-    throw new Error('AI client module cannot be imported on the client side!')
-}
-
-const apiKey = process.env.GEMINI_API_KEY
-
-if (!apiKey) {
-    throw new Error('Missing GEMINI_API_KEY environment variable')
-}
-
-const genAI = new GoogleGenerativeAI(apiKey)
-
-// Using gemini-1.5-flash as a stable default, or gemini-2.0-flash-exp if available and desired.
-// Ideally usage of 'gemini-1.5-flash' is safest for general demo stability.
-export const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-        responseMimeType: "application/json",
-    }
-})
+// This file is kept for reference but the exports are no longer used.
+// You can safely delete this file.

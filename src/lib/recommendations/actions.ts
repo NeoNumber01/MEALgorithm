@@ -1,7 +1,6 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { model } from '@/lib/ai/client'
 
 interface MealAnalysis {
     summary: {
@@ -91,7 +90,7 @@ function extractFrequentIngredients(mealDescriptions: string[]): string[] {
 
 // Get cached recommendations or generate new ones
 export async function getRecommendations(forceRefresh = false): Promise<RecommendationResult | { error: string }> {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not authenticated' }
@@ -108,6 +107,7 @@ export async function getRecommendations(forceRefresh = false): Promise<Recommen
         const cached = profile.cached_next_meal as RecommendationResult
         const cacheTime = new Date(profile.next_meal_updated_at).getTime()
         const lastMealTime = profile.last_meal_at ? new Date(profile.last_meal_at).getTime() : 0
+        const profileUpdatedTime = profile.profile_updated_at ? new Date(profile.profile_updated_at).getTime() : 0
 
         // Check if the cached targets match current profile targets
         // This prevents unnecessary regeneration when profile is saved with same values
@@ -115,12 +115,21 @@ export async function getRecommendations(forceRefresh = false): Promise<Recommen
         const currentTargetCalories = profile.calorie_target || 2000
         const targetsMatch = cachedTargetCalories === currentTargetCalories
 
+        // Check if the cached goal matches current profile goal
+        const cachedGoal = cached.context?.goal
+        const currentGoal = profile.goal_description || 'General health'
+        const goalsMatch = cachedGoal === currentGoal
+
         // Use cache if:
         // 1. Cache is newer than last meal, AND
-        // 2. Target values haven't actually changed
-        if (cacheTime > lastMealTime && targetsMatch) {
+        // 2. Cache is newer than profile update (preferences change), AND
+        // 3. Target values haven't actually changed, AND
+        // 4. Goal description hasn't changed
+        if (cacheTime > lastMealTime && cacheTime > profileUpdatedTime && targetsMatch && goalsMatch) {
+            console.log('Recommendations: Using cached data (no changes detected)')
             return cached
         }
+        console.log('Recommendations: Cache invalid, regenerating...', { targetsMatch, goalsMatch, cacheTime, lastMealTime, profileUpdatedTime })
     }
 
     // Generate new recommendations
@@ -143,7 +152,7 @@ export async function getRecommendations(forceRefresh = false): Promise<Recommen
 // Internal function to generate new recommendations
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function generateNewRecommendations(userId: string, profile: any): Promise<RecommendationResult> {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get recent meals (last 3 days)
     const threeDaysAgo = new Date()
@@ -242,9 +251,28 @@ Provide exactly 3 recommendations in this JSON format:
 `
 
     try {
-        const result = await model.generateContent(prompt)
-        const text = result.response.text()
-        const parsed = JSON.parse(text)
+        // Get session for Edge Function auth
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+            throw new Error('No session')
+        }
+
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const response = await fetch(`${supabaseUrl}/functions/v1/ai-generate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ prompt, type: 'recommendations' }),
+        })
+
+        if (!response.ok) {
+            throw new Error(`Edge Function error: ${response.status}`)
+        }
+
+        const result = await response.json()
+        const parsed = result.data
 
         return {
             recommendations: parsed.recommendations,
@@ -288,7 +316,7 @@ Provide exactly 3 recommendations in this JSON format:
 
 // Get cached day plan or generate new one
 export async function getDayPlan(forceRefresh = false): Promise<DayPlanResult | { error: string }> {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not authenticated' }
@@ -305,6 +333,7 @@ export async function getDayPlan(forceRefresh = false): Promise<DayPlanResult | 
         const cached = profile.cached_day_plan as DayPlanResult
         const cacheTime = new Date(profile.day_plan_updated_at).getTime()
         const lastMealTime = profile.last_meal_at ? new Date(profile.last_meal_at).getTime() : 0
+        const profileUpdatedTime = profile.profile_updated_at ? new Date(profile.profile_updated_at).getTime() : 0
 
         // Check if the cached targets match current profile targets
         const cachedTargetCalories = cached.context?.targetCalories
@@ -313,10 +342,13 @@ export async function getDayPlan(forceRefresh = false): Promise<DayPlanResult | 
 
         // Use cache if:
         // 1. Cache is newer than last meal, AND
-        // 2. Target values haven't actually changed
-        if (cacheTime > lastMealTime && targetsMatch) {
+        // 2. Cache is newer than profile update (preferences/goal change), AND
+        // 3. Target values haven't actually changed
+        if (cacheTime > lastMealTime && cacheTime > profileUpdatedTime && targetsMatch) {
+            console.log('Day Plan: Using cached data (no changes detected)')
             return cached
         }
+        console.log('Day Plan: Cache invalid, regenerating...', { targetsMatch, cacheTime, lastMealTime, profileUpdatedTime })
     }
 
     // Generate new day plan
@@ -339,7 +371,7 @@ export async function getDayPlan(forceRefresh = false): Promise<DayPlanResult | 
 // Internal function to generate new day plan
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function generateNewDayPlan(userId: string, profile: any): Promise<DayPlanResult> {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get today's meals
     const today = new Date()
@@ -436,9 +468,28 @@ Respond in this exact JSON format:
 `
 
     try {
-        const result = await model.generateContent(prompt)
-        const text = result.response.text()
-        const parsed = JSON.parse(text)
+        // Get session for Edge Function auth
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+            throw new Error('No session')
+        }
+
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const response = await fetch(`${supabaseUrl}/functions/v1/ai-generate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ prompt, type: 'recommendations' }),
+        })
+
+        if (!response.ok) {
+            throw new Error(`Edge Function error: ${response.status}`)
+        }
+
+        const result = await response.json()
+        const parsed = result.data
 
         return {
             dayPlan: parsed.dayPlan,

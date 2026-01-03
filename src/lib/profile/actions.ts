@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { calculateTDEE, calculateMacroTargets, Gender, ActivityLevel } from '@/lib/nutrition/calculator'
 
 export async function getProfile() {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) return { error: 'Not authenticated' }
@@ -35,7 +35,7 @@ export async function updateProfile(data: {
     carbs_target?: number
     fat_target?: number
 }) {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) return { error: 'Not authenticated' }
@@ -133,7 +133,7 @@ export async function updateProfile(data: {
 }
 
 export async function getCachedFeedback() {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) return { error: 'Not authenticated' }
@@ -152,7 +152,7 @@ export async function getCachedFeedback() {
 }
 
 export async function updateCachedFeedback(feedback: string) {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) return { error: 'Not authenticated' }
@@ -169,7 +169,7 @@ export async function updateCachedFeedback(feedback: string) {
 }
 
 export async function updateLastMealTime() {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) return

@@ -1,7 +1,6 @@
 'use server'
 
-import { model } from './client'
-import { SYSTEM_PROMPT } from './prompts'
+import { createClient } from '@/lib/supabase/server'
 import { MealAnalysisSchema } from './schema'
 
 
@@ -21,58 +20,84 @@ export async function analyzeMeal(formData: FormData) {
         imageDescription: imageDescription 
     })
 
-    const promptParts: (string | { inlineData: { data: string; mimeType: string } })[] = [SYSTEM_PROMPT]
+    // Get Supabase client and user for auth
+    const supabase = await createClient()
+    
+    // First verify the user is authenticated
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+        console.error('Auth error:', userError)
+        return { error: 'Unauthorized - please sign in' }
+    }
+
+    // Get session for access token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session?.access_token) {
+        console.error('Session error:', sessionError)
+        return { error: 'Session expired - please sign in again' }
+    }
+
+    // Prepare request body for Edge Function
+    const requestBody: {
+        text?: string
+        imageBase64?: string
+        imageMimeType?: string
+        imageDescription?: string
+    } = {}
 
     if (textInput) {
-        promptParts.push(`\nUser Text Input: "${textInput}"`)
+        requestBody.text = textInput
     }
 
     if (imageFile) {
         const bytes = await imageFile.arrayBuffer()
         const base64Data = Buffer.from(bytes).toString('base64')
-        promptParts.push({
-            inlineData: {
-                data: base64Data,
-                mimeType: imageFile.type,
-            },
-        })
+        requestBody.imageBase64 = base64Data
+        requestBody.imageMimeType = imageFile.type
         
-        // Add user's additional description about the image
         if (imageDescription) {
-            promptParts.push(`\nIMPORTANT - User's additional notes about this meal: "${imageDescription}"\nPlease consider these details when analyzing portion sizes and nutritional content. For example, if the user says they only ate 1/4 of the food shown, adjust the nutritional values accordingly.`)
+            requestBody.imageDescription = imageDescription
         }
     }
 
     try {
-        const result = await model.generateContent(promptParts)
-        const responseText = result.response.text()
+        // Call Supabase Edge Function
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        console.log('Calling Edge Function:', `${supabaseUrl}/functions/v1/analyze-meal`)
+        
+        const response = await fetch(`${supabaseUrl}/functions/v1/analyze-meal`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(requestBody),
+        })
 
-        // Attempt parse
+        console.log('Edge Function response status:', response.status)
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            console.error('Edge Function Error:', errorData)
+            return { error: errorData.error || `Request failed: ${response.status}` }
+        }
+
+        const result = await response.json()
+
+        // Validate with Zod schema
         try {
-            const parsed = MealAnalysisSchema.parse(JSON.parse(responseText))
+            const parsed = MealAnalysisSchema.parse(result.data)
             return { data: parsed }
         } catch (parseError) {
-            console.warn('First parse failed, retrying...', parseError)
-
-            // Retry logic: Feed error back to model
-            const retryPrompt: (string | { inlineData: { data: string; mimeType: string } })[] = [
-                ...promptParts,
-                `\nPrevious Output: ${responseText}`,
-                `\nError: The JSON was invalid. Please fix it to match the schema strictly. JSON only.`,
-            ]
-
-            const retryResult = await model.generateContent(retryPrompt)
-            const retryText = retryResult.response.text()
-            try {
-                const reParsed = MealAnalysisSchema.parse(JSON.parse(retryText))
-                return { data: reParsed }
-            } catch {
-                return { error: 'Failed to parse AI response', raw: retryText }
-            }
+            console.warn('Schema validation failed:', parseError)
+            // Return raw data if schema validation fails but response was successful
+            return { data: result.data }
         }
 
     } catch (e) {
-        console.error('Gemini API Error:', e)
+        console.error('Edge Function API Error:', e)
         return { error: (e as Error).message || 'AI Service Error' }
     }
 }

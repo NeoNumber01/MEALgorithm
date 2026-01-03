@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { getProfile, updateProfile } from '@/lib/profile/actions'
 import { calculateTDEE, calculateMacroTargets, Gender, ActivityLevel } from '@/lib/nutrition/calculator'
+import { notifyGoalUpdated, notifyDataUpdated } from '@/lib/cache-utils'
 
 export default function ProfileSettings() {
     const [loading, setLoading] = useState(true)
@@ -82,6 +83,9 @@ export default function ProfileSettings() {
             setMessage({ type: 'error', text: result.error || 'Unknown error' })
         } else {
             setMessage({ type: 'success', text: 'Profile saved successfully!' })
+            // Notify that goals/targets have been updated - this will invalidate AI caches
+            notifyGoalUpdated()
+            notifyDataUpdated()
         }
 
         setSaving(false)
