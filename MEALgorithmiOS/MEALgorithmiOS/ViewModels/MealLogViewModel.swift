@@ -90,7 +90,7 @@ final class MealLogViewModel: ObservableObject {
                     createdAt: mealDate
                 )
             } else {
-               throw AppError.unknown(NSError(domain: "MealLogViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Repository not configured"]))
+               throw AppError.unknown("Repository not configured")
             }
             
             step = .done

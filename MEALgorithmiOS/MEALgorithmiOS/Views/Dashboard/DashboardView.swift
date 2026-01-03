@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Dashboard View
 struct DashboardView: View {
     @StateObject private var viewModel = DashboardViewModel()
+    @EnvironmentObject var networkMonitor: NetworkMonitor
     
     var body: some View {
         NavigationStack {
@@ -18,26 +19,24 @@ struct DashboardView: View {
                 )
                 .ignoresSafeArea()
                 
-                if viewModel.isLoading {
-                    LoadingView(message: "Loading your nutrition data...")
-                } else {
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            // Header
-                            headerSection
-                            
-                            if viewModel.viewMode == .today {
-                                todayContent
-                            } else {
-                                statisticsContent
-                            }
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Header
+                        headerSection
+                            .skeleton(isLoading: viewModel.isLoading)
+                        
+                        if viewModel.viewMode == .today {
+                            todayContent
+                        } else {
+                            statisticsContent
                         }
-                        .padding(.horizontal)
-                        .padding(.bottom, 100) // Space for tab bar
                     }
-                    .refreshable {
-                        await viewModel.refresh()
-                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 100) // Space for tab bar
+                }
+                .disabled(viewModel.isLoading)
+                .refreshable {
+                    await viewModel.refresh()
                 }
             }
             .task {
@@ -110,6 +109,7 @@ struct DashboardView: View {
                                 .cornerRadius(8)
                         }
                         .foregroundColor(viewModel.viewMode == mode ? .primary : .secondary)
+                        .hapticFeedback(style: .light)
                     }
                 }
                 .padding(4)
@@ -131,6 +131,7 @@ struct DashboardView: View {
             .frame(height: 250)
             .liquidGlass()
             .hoverEffect()
+            .skeleton(isLoading: viewModel.isLoading)
             
             // Macro Cards
             HStack(spacing: 12) {
@@ -161,6 +162,7 @@ struct DashboardView: View {
                     colors: [.fatColor, .fatColor.opacity(0.7)]
                 )
             }
+            .skeleton(isLoading: viewModel.isLoading)
             
             // AI Feedback
             if !viewModel.aiFeedback.isEmpty || viewModel.isFeedbackLoading {
@@ -171,7 +173,32 @@ struct DashboardView: View {
             }
             
             // Today's Meals
-            if !viewModel.todayMeals.isEmpty {
+            if viewModel.isLoading {
+                // Skeleton Mock Items
+                VStack(spacing: 12) {
+                    Text("🍽️ Today's Meals")
+                        .font(.headline)
+                        .skeleton(isLoading: true)
+                    
+                    ForEach(0..<3) { _ in
+                        HStack {
+                            RoundedRectangle(cornerRadius: 10).frame(width: 44, height: 44)
+                            VStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 4).frame(width: 100, height: 16)
+                                RoundedRectangle(cornerRadius: 4).frame(width: 60, height: 12)
+                            }
+                            Spacer()
+                            RoundedRectangle(cornerRadius: 4).frame(width: 50, height: 20)
+                        }
+                        .padding()
+                        .background(Color(.systemBackground).opacity(0.5))
+                        .cornerRadius(12)
+                        .skeleton(isLoading: true)
+                    }
+                }
+                .padding()
+                .liquidGlass()
+            } else if !viewModel.todayMeals.isEmpty {
                 TodayMealsSection(
                     meals: viewModel.todayMeals,
                     onMealTap: { meal in
@@ -394,6 +421,7 @@ struct TodayMealsSection: View {
                     .cornerRadius(12)
                 }
                 .buttonStyle(.plain)
+                .hapticFeedback(style: .light)
             }
         }
         .padding()
@@ -631,6 +659,15 @@ extension DashboardView {
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(.appPrimary)
+                    }
+                    .disabled(!networkMonitor.isConnected)
+                    .opacity(networkMonitor.isConnected ? 1 : 0.5)
+                    .hapticFeedback(style: .medium)
+                    
+                    if !networkMonitor.isConnected {
+                        Text("Connect to internet to generate insights")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 } else if !viewModel.statisticsInsight.isEmpty {
                     Text(viewModel.statisticsInsight)

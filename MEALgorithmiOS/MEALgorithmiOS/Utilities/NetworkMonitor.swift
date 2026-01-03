@@ -3,7 +3,7 @@ import Network
 
 // MARK: - Network Monitor
 /// Monitors network connectivity status
-final class NetworkMonitor: ObservableObject {
+class NetworkMonitor: ObservableObject {
     static let shared = NetworkMonitor()
     
     private let monitor = NWPathMonitor()

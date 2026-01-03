@@ -19,7 +19,15 @@ final class SyncEngine: ObservableObject {
     // Dependencies
     private var modelContainer: ModelContainer?
     private let mealService: MealServiceProtocol
-    private let networkMonitor: NetworkMonitor
+    // private let networkMonitor: NetworkMonitor // Removed in favor of publisher but might need current state access?
+    // Actually, we need current state too.
+    // Let's keep it simple: Accept an object dealing with network.
+    // Or just accept the publisher and assume we can query current state?
+    // SyncEngine checks `networkMonitor.isConnected` in `syncPendingItems`. 
+    // So we need a Protocol or Closure for that.
+    
+    private let isConnected: () -> Bool
+    private let networkPublisher: AnyPublisher<Bool, Never>
     
     // State
     @Published var isSyncing = false
@@ -30,12 +38,26 @@ final class SyncEngine: ObservableObject {
     private var retryAttempt = 0
     private let maxRetries = 5
     
-    private init(
+    init(
         mealService: MealServiceProtocol = MealService(),
         networkMonitor: NetworkMonitor = NetworkMonitor.shared
     ) {
         self.mealService = mealService
-        self.networkMonitor = networkMonitor
+        self.isConnected = { networkMonitor.isConnected }
+        self.networkPublisher = networkMonitor.$isConnected.eraseToAnyPublisher()
+        
+        setupObservers()
+    }
+    
+    // Test Init
+    init(
+        mealService: MealServiceProtocol,
+        isConnected: @escaping () -> Bool,
+        networkPublisher: AnyPublisher<Bool, Never>
+    ) {
+        self.mealService = mealService
+        self.isConnected = isConnected
+        self.networkPublisher = networkPublisher
         
         setupObservers()
     }
@@ -47,7 +69,7 @@ final class SyncEngine: ObservableObject {
     
     private func setupObservers() {
         // Auto-sync when network returns
-        networkMonitor.$isConnected
+        networkPublisher
             .dropFirst()
             .removeDuplicates()
             .filter { $0 }
@@ -62,7 +84,7 @@ final class SyncEngine: ObservableObject {
     /// Trigger synchronization
     func syncPendingItems() async {
         guard let container = modelContainer else { return }
-        guard networkMonitor.isConnected else { return }
+        guard isConnected() else { return }
         guard !isSyncing else { return }
         
         isSyncing = true

@@ -25,9 +25,19 @@ final class RecommendationsViewModel: ObservableObject {
     }
     
     // MARK: - Services
-    private let geminiService = GeminiService()
-    private let profileService = ProfileService()
-    private let mealService = MealService()
+    private let geminiService: GeminiServiceProtocol
+    private let profileService: ProfileServiceProtocol
+    private let mealService: MealServiceProtocol
+    
+    init(
+        geminiService: GeminiServiceProtocol = GeminiService(),
+        profileService: ProfileServiceProtocol = ProfileService(),
+        mealService: MealServiceProtocol = MealService()
+    ) {
+        self.geminiService = geminiService
+        self.profileService = profileService
+        self.mealService = mealService
+    }
     
     // MARK: - Load on View Mode Change
     func onViewModeChange() async {

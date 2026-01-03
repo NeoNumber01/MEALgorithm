@@ -218,6 +218,93 @@ struct OfflineBanner: View {
     }
 }
 
+// MARK: - Haptic Manager
+/// Manages haptic feedback for a premium feel
+class HapticManager {
+    static let shared = HapticManager()
+    
+    private init() {}
+    
+    func notification(type: UINotificationFeedbackGenerator.FeedbackType) {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(type)
+    }
+    
+    func impact(style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        let generator = UIImpactFeedbackGenerator(style: style)
+        generator.impactOccurred()
+    }
+    
+    func selection() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.selectionChanged()
+    }
+}
+
+// MARK: - Skeleton Loading Modifier
+/// Adds a shimmering skeleton effect for loading states
+struct SkeletonModifier: ViewModifier {
+    let isLoading: Bool
+    let opacity: Double
+    let duration: Double
+    
+    @State private var phase: CGFloat = 0
+    
+    init(isLoading: Bool, opacity: Double = 0.5, duration: Double = 1.5) {
+        self.isLoading = isLoading
+        self.opacity = opacity
+        self.duration = duration
+    }
+    
+    func body(content: Content) -> some View {
+        if isLoading {
+            content
+                .opacity(0)
+                .overlay(
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            // Background
+                            Color(.systemGray5)
+                            
+                            // Highlight
+                            LinearGradient(
+                                gradient: Gradient(stops: [
+                                    .init(color: .clear, location: 0),
+                                    .init(color: .white.opacity(0.5), location: 0.5),
+                                    .init(color: .clear, location: 1)
+                                ]),
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .frame(width: 150)
+                            .offset(x: phase * geo.size.width * 2 - 50)
+                        }
+                    }
+                )
+                .mask(content)
+                .onAppear {
+                    withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
+                        phase = 1
+                    }
+                }
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    func skeleton(isLoading: Bool) -> some View {
+        modifier(SkeletonModifier(isLoading: isLoading))
+    }
+    
+    func hapticFeedback(style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) -> some View {
+        self.simultaneousGesture(TapGesture().onEnded { _ in
+            HapticManager.shared.impact(style: style)
+        })
+    }
+}
+
 // MARK: - Previews
 #Preview("Tab Bar") {
     VStack {

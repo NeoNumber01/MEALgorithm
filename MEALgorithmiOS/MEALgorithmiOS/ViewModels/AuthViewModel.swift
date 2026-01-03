@@ -17,7 +17,12 @@ final class AuthViewModel: ObservableObject {
     var currentNonce: String?
     
     // MARK: - Services
-    private let authService = AuthService()
+    // MARK: - Services
+    private let authService: AuthServiceProtocol
+    
+    init(authService: AuthServiceProtocol = AuthService()) {
+        self.authService = authService
+    }
     
     // MARK: - Session Check
     /// Check for existing session on app launch

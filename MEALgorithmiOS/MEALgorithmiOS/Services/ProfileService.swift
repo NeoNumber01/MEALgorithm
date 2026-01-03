@@ -3,7 +3,7 @@ import Supabase
 
 // MARK: - Profile Service
 /// Handles profile CRUD operations with Supabase
-actor ProfileService {
+actor ProfileService: ProfileServiceProtocol {
     private let client: SupabaseClient
     
     init(client: SupabaseClient = SupabaseManager.shared.client) {

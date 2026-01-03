@@ -77,10 +77,21 @@ final class DashboardViewModel: ObservableObject {
     }
     
     // MARK: - Services
-    private let mealService = MealService()
-    private let profileService = ProfileService()
-    private let geminiService = GeminiService()
-    private let cacheService = CacheService.shared
+    // MARK: - Services
+    private let mealService: MealServiceProtocol
+    private let profileService: ProfileServiceProtocol
+    private let geminiService: GeminiServiceProtocol
+    private let cacheService = CacheService.shared // Singleton, tough to mock unless we wrap it or protocol it.
+    
+    init(
+        mealService: MealServiceProtocol = MealService(),
+        profileService: ProfileServiceProtocol = ProfileService(),
+        geminiService: GeminiServiceProtocol = GeminiService()
+    ) {
+        self.mealService = mealService
+        self.profileService = profileService
+        self.geminiService = geminiService
+    }
     
     // MARK: - Load Data
     /// Load all dashboard data (with caching for faster loads)

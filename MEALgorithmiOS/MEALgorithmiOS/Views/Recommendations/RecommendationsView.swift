@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Recommendations View
 struct RecommendationsView: View {
     @StateObject private var viewModel = RecommendationsViewModel()
+    @EnvironmentObject var networkMonitor: NetworkMonitor
     @State private var showPreferences = false
     
     var body: some View {
@@ -90,6 +91,7 @@ struct RecommendationsView: View {
             .liquidGlass()
         }
         .foregroundColor(.primary)
+        .hapticFeedback(style: .light)
     }
     
     // MARK: - Header Section
@@ -146,6 +148,7 @@ struct RecommendationsView: View {
                 .shadow(color: viewModel.viewMode == .dayPlan ? .black.opacity(0.05) : .clear, radius: 4)
             }
             .foregroundColor(viewModel.viewMode == .dayPlan ? .primary : .secondary)
+            .hapticFeedback(style: .light)
         }
         .padding(4)
         .background(Color(.systemGray5))
@@ -155,7 +158,24 @@ struct RecommendationsView: View {
     // MARK: - Next Meal Content
     private var nextMealContent: some View {
         VStack(spacing: 16) {
-            if viewModel.isLoadingNextMeal && viewModel.recommendations.isEmpty {
+            if viewModel.isLoadingNextMeal {
+                // Skeleton State
+                ContextCard(targetCalories: 2000, recentAvg: 500, goal: "Loading...")
+                    .skeleton(isLoading: true)
+                
+                ForEach(0..<3) { _ in
+                    RecommendationCard(
+                        recommendation: Recommendation(
+                            name: "Loading Meal Name",
+                            description: "Loading description of the meal...",
+                            reason: "Loading reason...",
+                            nutrition: .zero
+                        ),
+                        rank: 1
+                    )
+                    .skeleton(isLoading: true)
+                }
+            } else if viewModel.recommendations.isEmpty {
                 LoadingCard(message: "Finding meal ideas...")
             } else {
                 // Context Card
@@ -191,7 +211,15 @@ struct RecommendationsView: View {
                     .foregroundColor(.appPrimary)
                     .fontWeight(.medium)
                 }
-                .disabled(viewModel.isLoadingNextMeal)
+                .disabled(viewModel.isLoadingNextMeal || !networkMonitor.isConnected)
+                .opacity(networkMonitor.isConnected ? 1.0 : 0.5)
+                .hapticFeedback(style: .medium)
+                
+                if !networkMonitor.isConnected {
+                    Text("Connect to internet for new suggestions")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
         }
     }
@@ -199,7 +227,27 @@ struct RecommendationsView: View {
     // MARK: - Day Plan Content
     private var dayPlanContent: some View {
         VStack(spacing: 16) {
-            if viewModel.isLoadingDayPlan && viewModel.dayPlan.isEmpty && viewModel.dayContext == nil {
+            if viewModel.isLoadingDayPlan {
+                // Skeleton State
+                DayProgressCard(context: DayPlanContext(
+                    targetCalories: 2000,
+                    consumedCalories: 1000,
+                    remainingCalories: 1000,
+                    eatenMealTypes: [],
+                    remainingMealTypes: ["Lunch", "Dinner"]
+                ))
+                .skeleton(isLoading: true)
+                
+                ForEach(0..<3) { _ in
+                    DayPlanMealCard(meal: DayPlanMeal(
+                        mealType: "lunch",
+                        name: "Loading Meal...",
+                        description: "Loading meal description...",
+                        nutrition: .zero
+                    ))
+                    .skeleton(isLoading: true)
+                }
+            } else if viewModel.dayPlan.isEmpty && viewModel.dayContext == nil {
                 LoadingCard(message: "Planning your day...")
             } else {
                 // Progress Context
@@ -243,7 +291,15 @@ struct RecommendationsView: View {
                     .foregroundColor(.green)
                     .fontWeight(.medium)
                 }
-                .disabled(viewModel.isLoadingDayPlan)
+                .disabled(viewModel.isLoadingDayPlan || !networkMonitor.isConnected)
+                .opacity(networkMonitor.isConnected ? 1.0 : 0.5)
+                .hapticFeedback(style: .medium)
+                
+                if !networkMonitor.isConnected {
+                    Text("Connect to internet to regenerate")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
         }
     }

@@ -24,8 +24,27 @@ protocol MealServiceProtocol: Actor {
     func getImageURL(path: String) -> URL?
 }
 
+// MARK: - Profile Service Protocol
+protocol ProfileServiceProtocol: Actor {
+    func getProfile() async throws -> Profile
+    func updateProfile(_ update: ProfileUpdate) async throws
+    func updateCachedFeedback(_ feedback: String) async throws
+}
+
 // MARK: - Gemini Service Protocol
 /// Abstracting the AI service for easier mocking
 protocol GeminiServiceProtocol: Sendable {
     func analyzeMeal(text: String?, image: UIImage?) async throws -> MealAnalysis
+    func generateFeedback(todayCalories: Int, weeklyAvgCalories: Int, targetCalories: Int, goal: String?) async throws -> String
+
+    func generateStatisticsInsight(periodLabel: String, totalDays: Int, daysWithMeals: Int, totalMeals: Int, avgCalories: Int, avgProtein: Int, avgCarbs: Int, avgFat: Int, targetCalories: Int, goalDescription: String?) async throws -> String
+    
+    func generateRecommendations(targetCalories: Int, recentAvgCalories: Int, goal: String?, preferences: [String]?) async throws -> [Recommendation]
+    
+    func generateDayPlan(targetCalories: Int, consumedCalories: Int, eatenMealTypes: [String], goal: String?, preferences: [String]?) async throws -> (meals: [DayPlanMeal], summary: DayPlanSummary)
+}
+
+// MARK: - Network Monitor Protocol
+protocol NetworkMonitorProtocol: ObservableObject {
+    var isConnected: Bool { get }
 }
