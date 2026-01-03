@@ -1,4 +1,5 @@
 import LoginButton from '@/components/auth/LoginButton'
+import EmailAuthForm from '@/components/auth/EmailAuthForm'
 
 export default function LoginPage() {
     return (
@@ -16,10 +17,25 @@ export default function LoginPage() {
             />
 
             <div className="relative z-10 p-8 bg-white/70 backdrop-blur-xl shadow-2xl border border-white/40 rounded-3xl text-center w-full max-w-sm">
-                <div className="text-4xl mb-4">🫐</div>
+                <div className="text-4xl mb-4">🍋‍🟩</div>
                 <h1 className="text-3xl font-bold mb-2 text-gray-900">MEALgorithm</h1>
-                <p className="text-gray-600 mb-8">Sign in to track your nutrition</p>
-                <div className="flex flex-col gap-4">
+                <p className="text-gray-600 mb-6">Sign in to track your nutrition</p>
+                
+                {/* Email Auth Form */}
+                <EmailAuthForm />
+                
+                {/* Divider */}
+                <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                        <span className="px-4 bg-white/70 text-gray-500">or continue with</span>
+                    </div>
+                </div>
+                
+                {/* OAuth Buttons */}
+                <div className="flex flex-col gap-3">
                     <LoginButton provider="google" />
                     <LoginButton provider="github" />
                 </div>

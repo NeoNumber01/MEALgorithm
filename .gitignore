@@ -46,3 +46,13 @@ venv/
 
 # Supabase
 supabase/functions/*/deno.lock
+
+# Electron build output (may contain sensitive data baked into JS bundles)
+/dist-electron/
+*.portable.exe
+
+# Environment files with actual secrets
+.env
+.env.local
+.env.*.local
+!.env.example

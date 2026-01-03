@@ -14,6 +14,7 @@ export default function MealLogForm() {
     const [textInput, setTextInput] = useState('')
     const [imageFile, setImageFile] = useState<File | null>(null)
     const [imagePreview, setImagePreview] = useState<string | null>(null)
+    const [imageDescription, setImageDescription] = useState('') // Additional text for image mode
     const [analysis, setAnalysis] = useState<MealAnalysis | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('lunch')
@@ -50,6 +51,10 @@ export default function MealLogForm() {
             formData.append('text', textInput)
         } else if (imageFile) {
             formData.append('image', imageFile)
+            // Include additional description if provided
+            if (imageDescription.trim()) {
+                formData.append('imageDescription', imageDescription.trim())
+            }
         }
 
         const result = await analyzeMeal(formData)
@@ -107,6 +112,7 @@ export default function MealLogForm() {
         setTextInput('')
         setImageFile(null)
         setImagePreview(null)
+        setImageDescription('')
         setAnalysis(null)
         setError(null)
         // Reset time to now on new entry
@@ -170,36 +176,55 @@ export default function MealLogForm() {
                             className="w-full h-32 p-4 border rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                     ) : (
-                        <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                            {imagePreview ? (
-                                <div className="space-y-4">
-                                    <img
-                                        src={imagePreview}
-                                        alt="Meal preview"
-                                        className="max-h-64 mx-auto rounded-lg"
-                                    />
-                                    <button
-                                        onClick={() => {
-                                            setImageFile(null)
-                                            setImagePreview(null)
-                                        }}
-                                        className="text-red-600 hover:underline"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            ) : (
-                                <label className="cursor-pointer">
-                                    <div className="text-4xl mb-2">📷</div>
-                                    <p className="text-gray-600">Click to upload a photo of your meal</p>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleImageChange}
-                                        className="hidden"
-                                    />
+                        <div className="space-y-4">
+                            <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                                {imagePreview ? (
+                                    <div className="space-y-4">
+                                        <img
+                                            src={imagePreview}
+                                            alt="Meal preview"
+                                            className="max-h-64 mx-auto rounded-lg"
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                setImageFile(null)
+                                                setImagePreview(null)
+                                            }}
+                                            className="text-red-600 hover:underline"
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <label className="cursor-pointer">
+                                        <div className="text-4xl mb-2">📷</div>
+                                        <p className="text-gray-600">Click to upload a photo of your meal</p>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageChange}
+                                            className="hidden"
+                                        />
+                                    </label>
+                                )}
+                            </div>
+                            
+                            {/* Additional description input for photo mode */}
+                            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-100">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <span className="mr-2">✍️</span>
+                                    Additional Details (Optional)
                                 </label>
-                            )}
+                                <textarea
+                                    value={imageDescription}
+                                    onChange={(e) => setImageDescription(e.target.value)}
+                                    placeholder="Add any details about your meal... e.g., 'I only ate 1/4 of the pizza' or 'This is a small portion, about 100g'"
+                                    className="w-full h-24 p-3 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white/80"
+                                />
+                                <p className="text-xs text-gray-500 mt-2">
+                                    💡 Tip: Mention portion sizes, what you didn&apos;t eat, or any modifications for more accurate analysis.
+                                </p>
+                            </div>
                         </div>
                     )}
 

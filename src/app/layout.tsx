@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { createClient } from "@/lib/supabase/server";
 import Navbar from "@/components/Navbar";
+import FullscreenButton from "@/components/FullscreenButton";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -22,8 +23,11 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} antialiased`}>
+        <FullscreenButton />
         {user && <Navbar userEmail={user.email} />}
-        {children}
+        <main className="page-transition">
+          {children}
+        </main>
       </body>
     </html>
   );

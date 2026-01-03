@@ -8,13 +8,18 @@ import { MealAnalysisSchema } from './schema'
 export async function analyzeMeal(formData: FormData) {
     const textInput = formData.get('text') as string | null
     const imageFile = formData.get('image') as File | null
+    const imageDescription = formData.get('imageDescription') as string | null
 
     if (!textInput && !imageFile) {
         console.log('analyzeMeal: No input provided')
         return { error: 'No input provided' }
     }
 
-    console.log('analyzeMeal: Processing input...', { text: textInput, hasImage: !!imageFile })
+    console.log('analyzeMeal: Processing input...', { 
+        text: textInput, 
+        hasImage: !!imageFile,
+        imageDescription: imageDescription 
+    })
 
     const promptParts: (string | { inlineData: { data: string; mimeType: string } })[] = [SYSTEM_PROMPT]
 
@@ -31,6 +36,11 @@ export async function analyzeMeal(formData: FormData) {
                 mimeType: imageFile.type,
             },
         })
+        
+        // Add user's additional description about the image
+        if (imageDescription) {
+            promptParts.push(`\nIMPORTANT - User's additional notes about this meal: "${imageDescription}"\nPlease consider these details when analyzing portion sizes and nutritional content. For example, if the user says they only ate 1/4 of the food shown, adjust the nutritional values accordingly.`)
+        }
     }
 
     try {
