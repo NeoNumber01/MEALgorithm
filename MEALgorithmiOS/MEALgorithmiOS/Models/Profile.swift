@@ -21,6 +21,12 @@ struct Profile: Codable, Identifiable, Equatable {
     var lastMealAt: Date?
     var updatedAt: Date?
     
+    // Food preferences for AI recommendations
+    var foodPreferences: String?
+    var foodDislikes: String?
+    var dietaryRestrictions: String?
+    var customNotes: String?
+    
     enum CodingKeys: String, CodingKey {
         case id
         case calorieTarget = "calorie_target"
@@ -39,6 +45,10 @@ struct Profile: Codable, Identifiable, Equatable {
         case feedbackUpdatedAt = "feedback_updated_at"
         case lastMealAt = "last_meal_at"
         case updatedAt = "updated_at"
+        case foodPreferences = "food_preferences"
+        case foodDislikes = "food_dislikes"
+        case dietaryRestrictions = "dietary_restrictions"
+        case customNotes = "custom_notes"
     }
 }
 
@@ -99,6 +109,10 @@ struct ProfileUpdate: Codable {
     var proteinTarget: Int?
     var carbsTarget: Int?
     var fatTarget: Int?
+    var foodPreferences: String?
+    var foodDislikes: String?
+    var dietaryRestrictions: String?
+    var customNotes: String?
     
     enum CodingKeys: String, CodingKey {
         case calorieTarget = "calorie_target"
@@ -111,5 +125,9 @@ struct ProfileUpdate: Codable {
         case proteinTarget = "protein_target"
         case carbsTarget = "carbs_target"
         case fatTarget = "fat_target"
+        case foodPreferences = "food_preferences"
+        case foodDislikes = "food_dislikes"
+        case dietaryRestrictions = "dietary_restrictions"
+        case customNotes = "custom_notes"
     }
 }

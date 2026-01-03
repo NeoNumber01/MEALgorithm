@@ -110,6 +110,13 @@ final class SettingsViewModel: ObservableObject {
         error = nil
         saveSuccess = false
         
+        // Validate inputs (matching Web implementation)
+        if let validationError = validateProfile() {
+            error = validationError
+            isSaving = false
+            return
+        }
+        
         let update = ProfileUpdate(
             calorieTarget: calorieTarget,
             goalDescription: goalDescription.isEmpty ? nil : goalDescription,
@@ -131,10 +138,52 @@ final class SettingsViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             saveSuccess = false
         } catch {
-            self.error = "Failed to save profile"
+            self.error = AppError.from(error).localizedDescription
         }
         
         isSaving = false
+    }
+    
+    // MARK: - Validate Profile (matching Web implementation)
+    /// Validates profile data before saving
+    private func validateProfile() -> String? {
+        var errors: [String] = []
+        
+        if let height = heightCm {
+            if height < 50 || height > 250 {
+                errors.append("Height must be between 50 and 250 cm")
+            }
+        }
+        
+        if let weight = weightKg {
+            if weight < 10 || weight > 500 {
+                errors.append("Weight must be between 10 and 500 kg")
+            }
+        }
+        
+        if let userAge = age {
+            if userAge < 1 || userAge > 120 {
+                errors.append("Age must be between 1 and 120 years")
+            }
+        }
+        
+        if calorieTarget < 500 || calorieTarget > 10000 {
+            errors.append("Calorie target must be between 500 and 10,000 kcal")
+        }
+        
+        if proteinTarget < 0 || proteinTarget > 500 {
+            errors.append("Protein target must be between 0 and 500g")
+        }
+        
+        if carbsTarget < 0 || carbsTarget > 1000 {
+            errors.append("Carbs target must be between 0 and 1,000g")
+        }
+        
+        if fatTarget < 0 || fatTarget > 500 {
+            errors.append("Fat target must be between 0 and 500g")
+        }
+        
+        return errors.isEmpty ? nil : errors.joined(separator: ". ")
     }
     
     // MARK: - Toggle Custom Targets

@@ -1,9 +1,10 @@
 import Foundation
 import Supabase
+import AuthenticationServices
 
 // MARK: - Authentication Service
 /// Handles all authentication operations with Supabase
-actor AuthService {
+actor AuthService: AuthServiceProtocol {
     private let client: SupabaseClient
     
     init(client: SupabaseClient = SupabaseManager.shared.client) {
@@ -26,6 +27,18 @@ actor AuthService {
         return session
     }
     
+    // MARK: - Sign in with Apple
+    /// Sign in using Apple ID
+    func signInWithApple(idToken: String, nonce: String) async throws -> Session {
+        try await client.auth.signInWithIdToken(
+            credentials: .init(
+                provider: .apple,
+                idToken: idToken,
+                nonce: nonce
+            )
+        )
+    }
+    
     // MARK: - Sign Out
     /// Sign out the current user
     func signOut() async throws {
@@ -41,8 +54,8 @@ actor AuthService {
     /// Check if user is authenticated
     func isAuthenticated() async -> Bool {
         do {
-            let session = try await client.auth.session
-            return session.user.id != nil
+            _ = try await client.auth.session
+            return true
         } catch {
             return false
         }

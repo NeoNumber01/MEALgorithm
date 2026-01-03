@@ -3,7 +3,7 @@ import Supabase
 
 // MARK: - Meal Service
 /// Handles meal CRUD operations with Supabase
-actor MealService {
+actor MealService: MealServiceProtocol {
     private let client: SupabaseClient
     
     init(client: SupabaseClient = SupabaseManager.shared.client) {
@@ -19,9 +19,8 @@ actor MealService {
         mealType: MealType?,
         createdAt: Date = Date()
     ) async throws {
-        guard let userId = try await client.auth.session.user.id else {
-            throw MealServiceError.notAuthenticated
-        }
+        let session = try await client.auth.session
+        let userId = session.user.id
         
         let meal = MealCreate(
             userId: userId,
@@ -50,14 +49,16 @@ actor MealService {
             .update(LastMealUpdate(lastMealAt: Date()))
             .eq("id", value: userId)
             .execute()
+        
+        // Invalidate local cache
+        CacheService.shared.notifyDataUpdated()
     }
     
     // MARK: - Get Daily Meals
     /// Fetch meals for a specific date range
     func getDailyMeals(start: Date, end: Date) async throws -> [Meal] {
-        guard let userId = try await client.auth.session.user.id else {
-            throw MealServiceError.notAuthenticated
-        }
+        let session = try await client.auth.session
+        let userId = session.user.id
         
         let meals: [Meal] = try await client
             .from("meals")
@@ -98,9 +99,8 @@ actor MealService {
     // MARK: - Delete Meal
     /// Delete a meal by ID
     func deleteMeal(id: UUID) async throws {
-        guard let userId = try await client.auth.session.user.id else {
-            throw MealServiceError.notAuthenticated
-        }
+        let session = try await client.auth.session
+        let userId = session.user.id
         
         try await client
             .from("meals")
@@ -108,14 +108,16 @@ actor MealService {
             .eq("id", value: id)
             .eq("user_id", value: userId)
             .execute()
+        
+        // Invalidate local cache
+        CacheService.shared.notifyDataUpdated()
     }
     
     // MARK: - Upload Image
     /// Upload meal image to Supabase storage
-    func uploadMealImage(_ imageData: Data, fileExtension: String = "jpg") async throws -> String {
-        guard let userId = try await client.auth.session.user.id else {
-            throw MealServiceError.notAuthenticated
-        }
+    func uploadMealImage(_ imageData: Data, fileExtension: String) async throws -> String {
+        let session = try await client.auth.session
+        let userId = session.user.id
         
         let fileName = "\(userId.uuidString)/\(Int(Date().timeIntervalSince1970)).\(fileExtension)"
         

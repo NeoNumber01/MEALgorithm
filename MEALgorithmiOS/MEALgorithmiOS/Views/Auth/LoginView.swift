@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 // MARK: - Login View
 struct LoginView: View {
@@ -120,6 +121,34 @@ struct LoginView: View {
                                     .foregroundColor(.appPrimary)
                                     .fontWeight(.semibold)
                             }
+                            
+                            // Divider
+                            HStack {
+                                Rectangle()
+                                    .fill(Color.secondary.opacity(0.3))
+                                    .frame(height: 1)
+                                Text("or")
+                                    .foregroundColor(.secondary)
+                                    .font(.footnote)
+                                Rectangle()
+                                    .fill(Color.secondary.opacity(0.3))
+                                    .frame(height: 1)
+                            }
+                            .padding(.vertical, 8)
+                            
+                            // Sign in with Apple
+                            SignInWithAppleButton(.signIn) { request in
+                                let nonce = authViewModel.generateNonce()
+                                request.requestedScopes = [.email, .fullName]
+                                request.nonce = authViewModel.sha256(nonce)
+                            } onCompletion: { result in
+                                Task {
+                                    await authViewModel.handleAppleSignIn(result: result)
+                                }
+                            }
+                            .signInWithAppleButtonStyle(.black)
+                            .frame(height: 50)
+                            .cornerRadius(12)
                         }
                         .padding(24)
                         .liquidGlass()

@@ -200,6 +200,24 @@ struct ConfirmModal: View {
     }
 }
 
+// MARK: - Offline Banner
+struct OfflineBanner: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "wifi.slash")
+            Text("No Internet Connection")
+                .font(.subheadline)
+                .fontWeight(.medium)
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color.red)
+        .foregroundColor(.white)
+        .transition(.move(edge: .top))
+    }
+}
+
 // MARK: - Previews
 #Preview("Tab Bar") {
     VStack {

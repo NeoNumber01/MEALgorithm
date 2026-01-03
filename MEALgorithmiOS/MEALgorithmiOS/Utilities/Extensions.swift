@@ -94,7 +94,7 @@ extension Int {
     /// Format as percentage string
     func asPercentage(of total: Int) -> String {
         guard total > 0 else { return "0%" }
-        return "\(min(100, (self * 100) / total))%"
+        return "\(Swift.min(100, (self * 100) / total))%"
     }
 }
 

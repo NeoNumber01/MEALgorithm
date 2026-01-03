@@ -4,6 +4,7 @@ import PhotosUI
 // MARK: - Meal Log View
 struct MealLogView: View {
     @StateObject private var viewModel = MealLogViewModel()
+    @State private var showCamera = false
     
     var body: some View {
         NavigationStack {
@@ -32,8 +33,16 @@ struct MealLogView: View {
             }
             .navigationTitle("Log Meal")
             .navigationBarTitleDisplayMode(.large)
+            .sheet(isPresented: $showCamera) {
+                CameraView(image: $viewModel.selectedImage)
+            }
+        }
+        .onAppear {
+            viewModel.configure(modelContext: modelContext)
         }
     }
+    
+    @Environment(\.modelContext) private var modelContext
     
     // MARK: - Input View
     private var inputView: some View {
@@ -205,9 +214,9 @@ struct MealLogView: View {
                             }
                         }
                         
-                        // Camera button placeholder - would need camera capture implementation
+                        // Camera button
                         Button {
-                            // TODO: Open camera
+                            showCamera = true
                         } label: {
                             Label("Camera", systemImage: "camera")
                                 .fontWeight(.medium)
@@ -457,6 +466,46 @@ struct NutritionSummaryCard: View {
         .padding()
         .background(color.opacity(0.1))
         .cornerRadius(12)
+    }
+}
+
+// MARK: - Camera View
+/// UIViewControllerRepresentable wrapper for UIImagePickerController camera
+struct CameraView: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    @Environment(\.dismiss) var dismiss
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        picker.allowsEditing = false
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: CameraView
+        
+        init(_ parent: CameraView) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let uiImage = info[.originalImage] as? UIImage {
+                parent.image = uiImage
+            }
+            parent.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
     }
 }
 

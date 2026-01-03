@@ -29,9 +29,7 @@ struct DashboardView: View {
                             if viewModel.viewMode == .today {
                                 todayContent
                             } else {
-                                Text("Statistics View")
-                                    .foregroundColor(.secondary)
-                                // TODO: Add StatisticsView
+                                statisticsContent
                             }
                         }
                         .padding(.horizontal)
@@ -48,6 +46,15 @@ struct DashboardView: View {
             .sheet(item: $viewModel.selectedMeal) { meal in
                 MealDetailSheet(meal: meal) {
                     viewModel.mealToDelete = meal
+                }
+            }
+            .sheet(item: $viewModel.selectedDate) { date in
+                DayDetailSheet(
+                    date: date,
+                    meals: viewModel.getMealsForDate(date),
+                    targets: viewModel.targets
+                ) {
+                    viewModel.closeDayDetail()
                 }
             }
             .confirmationDialog(
@@ -505,6 +512,339 @@ struct NutritionBadge: View {
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Date Extension for Identifiable
+extension Date: @retroactive Identifiable {
+    public var id: TimeInterval { timeIntervalSince1970 }
+}
+
+// MARK: - Statistics Content Extension
+extension DashboardView {
+    var statisticsContent: some View {
+        VStack(spacing: 20) {
+            // Weekly Summary Card
+            VStack(spacing: 16) {
+                HStack {
+                    Text("📊")
+                    Text("Weekly Summary")
+                        .font(.headline)
+                }
+                
+                HStack(spacing: 20) {
+                    VStack {
+                        Text("\(viewModel.weeklyAverage)")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.caloriesColor)
+                        Text("Avg/Day")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    
+                    VStack {
+                        Text("\(viewModel.weeklyTotal.calories)")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.appPrimary)
+                        Text("Total kcal")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    
+                    VStack {
+                        Text("\(viewModel.weeklyMeals.count)")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.green)
+                        Text("Meals")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .padding()
+            .liquidGlass()
+            
+            // Weekly Chart
+            WeeklyChartView(
+                data: viewModel.weeklyCalorieData,
+                target: viewModel.targets.calories,
+                onDayTap: { date in
+                    viewModel.selectDay(date)
+                }
+            )
+            
+            // Weekly Macros
+            VStack(alignment: .leading, spacing: 12) {
+                Text("📈 Weekly Nutrition")
+                    .font(.headline)
+                
+                HStack(spacing: 12) {
+                    MacroSummaryCard(
+                        title: "Protein",
+                        value: viewModel.weeklyTotal.protein,
+                        color: .proteinColor
+                    )
+                    MacroSummaryCard(
+                        title: "Carbs",
+                        value: viewModel.weeklyTotal.carbs,
+                        color: .carbsColor
+                    )
+                    MacroSummaryCard(
+                        title: "Fat",
+                        value: viewModel.weeklyTotal.fat,
+                        color: .fatColor
+                    )
+                }
+            }
+            .padding()
+            .liquidGlass()
+            
+            // AI Insight Card (matching Web implementation)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("🤖")
+                        .font(.title2)
+                    Text("AI Insights")
+                        .font(.headline)
+                    if viewModel.isStatisticsInsightLoading {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
+                }
+                
+                if viewModel.statisticsInsight.isEmpty && !viewModel.isStatisticsInsightLoading {
+                    Button {
+                        Task {
+                            await viewModel.loadStatisticsInsight()
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "sparkles")
+                            Text("Generate AI Insight")
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.appPrimary)
+                    }
+                } else if !viewModel.statisticsInsight.isEmpty {
+                    Text(viewModel.statisticsInsight)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(nil)
+                }
+            }
+            .padding()
+            .liquidGlass()
+            .task {
+                // Auto-load insight when viewing statistics
+                if viewModel.statisticsInsight.isEmpty {
+                    await viewModel.loadStatisticsInsight()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Weekly Chart View
+struct WeeklyChartView: View {
+    let data: [(date: Date, calories: Int)]
+    let target: Int
+    let onDayTap: (Date) -> Void
+    
+    private var maxValue: Int {
+        max(data.map { $0.calories }.max() ?? 0, target)
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("📅 This Week")
+                .font(.headline)
+            
+            HStack(alignment: .bottom, spacing: 8) {
+                ForEach(data, id: \.date) { item in
+                    VStack(spacing: 4) {
+                        // Bar
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(item.calories >= target ? Color.green : Color.caloriesColor)
+                            .frame(height: maxValue > 0 ? CGFloat(item.calories) / CGFloat(maxValue) * 120 : 0)
+                            .frame(minHeight: 4)
+                        
+                        // Day label
+                        Text(item.date.shortDayName)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        
+                        // Calories
+                        Text("\(item.calories)")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(item.calories > 0 ? .primary : .secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .onTapGesture {
+                        if item.calories > 0 {
+                            onDayTap(item.date)
+                        }
+                    }
+                }
+            }
+            .frame(height: 160)
+            
+            // Target line info
+            HStack {
+                Rectangle()
+                    .fill(Color.green.opacity(0.3))
+                    .frame(width: 20, height: 3)
+                Text("Target: \(target) kcal")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .liquidGlass()
+    }
+}
+
+// MARK: - Macro Summary Card
+struct MacroSummaryCard: View {
+    let title: String
+    let value: Int
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("\(value)g")
+                .font(.title3)
+                .fontWeight(.bold)
+                .foregroundColor(color)
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(color.opacity(0.1))
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - Day Detail Sheet
+struct DayDetailSheet: View {
+    let date: Date
+    let meals: [Meal]
+    let targets: NutritionInfo
+    let onDismiss: () -> Void
+    
+    @Environment(\.dismiss) var dismiss
+    
+    private var dayTotal: NutritionInfo {
+        meals.totalNutrition
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Summary
+                    HStack(spacing: 16) {
+                        NutritionBadge(value: dayTotal.calories, label: "Calories", color: .caloriesColor)
+                        NutritionBadge(value: dayTotal.protein, label: "Protein", color: .proteinColor, suffix: "g")
+                        NutritionBadge(value: dayTotal.carbs, label: "Carbs", color: .carbsColor, suffix: "g")
+                        NutritionBadge(value: dayTotal.fat, label: "Fat", color: .fatColor, suffix: "g")
+                    }
+                    .padding()
+                    .liquidGlass()
+                    
+                    // Progress vs Target
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Progress vs Target")
+                            .font(.headline)
+                        
+                        let progress = min(Double(dayTotal.calories) / Double(targets.calories), 1.0)
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule()
+                                    .fill(Color.gray.opacity(0.2))
+                                Capsule()
+                                    .fill(dayTotal.calories > targets.calories ? Color.orange : Color.green)
+                                    .frame(width: geo.size.width * progress)
+                            }
+                        }
+                        .frame(height: 12)
+                        
+                        Text("\(dayTotal.calories) of \(targets.calories) kcal (\(Int(progress * 100))%)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .liquidGlass()
+                    
+                    // Meals List
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("🍽️ Meals (\(meals.count))")
+                            .font(.headline)
+                        
+                        if meals.isEmpty {
+                            Text("No meals logged this day")
+                                .foregroundColor(.secondary)
+                                .padding()
+                        } else {
+                            ForEach(Array(meals.enumerated()), id: \.element.id) { index, meal in
+                                HStack {
+                                    Text(meal.mealIcon(index: index))
+                                        .font(.title2)
+                                    
+                                    VStack(alignment: .leading) {
+                                        Text(meal.mealType?.displayName ?? "Meal")
+                                            .fontWeight(.medium)
+                                        Text(meal.formattedTime)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Text("\(meal.analysis?.summary.calories ?? 0) kcal")
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.caloriesColor)
+                                }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
+                            }
+                        }
+                    }
+                    .padding()
+                    .liquidGlass()
+                }
+                .padding()
+            }
+            .navigationTitle(date.formattedDate)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                        onDismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Date Extension for Short Day Name
+extension Date {
+    var shortDayName: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: self)
     }
 }
 

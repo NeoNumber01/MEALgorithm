@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import SwiftData
 
 // MARK: - Meal Log View Model
 /// Manages meal logging flow: input → AI analysis → save
@@ -31,8 +32,17 @@ final class MealLogViewModel: ObservableObject {
     }
     
     // MARK: - Services
-    private let geminiService = GeminiService()
-    private let mealService = MealService()
+    private let geminiService: GeminiServiceProtocol
+    private var mealRepository: MealRepository?
+    
+    init(geminiService: GeminiServiceProtocol = GeminiService()) {
+        self.geminiService = geminiService
+    }
+    
+    /// Configure with ModelContext (called from View)
+    func configure(modelContext: ModelContext, mealService: MealServiceProtocol = MealService()) {
+        self.mealRepository = MealRepository(context: modelContext, mealService: mealService)
+    }
     
     // MARK: - Analyze Meal
     /// Send input to Gemini for analysis
@@ -53,7 +63,7 @@ final class MealLogViewModel: ObservableObject {
             )
             self.analysis = result
         } catch {
-            self.error = error.localizedDescription
+            self.error = AppError.from(error).localizedDescription
             step = .input
         }
         
@@ -70,26 +80,22 @@ final class MealLogViewModel: ObservableObject {
         error = nil
         
         do {
-            var imagePath: String?
-            
-            // Upload image if present
-            if let image = selectedImage,
-               let imageData = image.jpegData(compressionQuality: 0.8) {
-                imagePath = try await mealService.uploadMealImage(imageData)
-            }
-            
             // Save meal
-            try await mealService.saveMeal(
-                textContent: inputMode == .text ? textInput : nil,
-                imagePath: imagePath,
-                analysis: analysis,
-                mealType: mealType,
-                createdAt: mealDate
-            )
+            if let repository = mealRepository {
+                try await repository.saveMeal(
+                    textContent: inputMode == .text ? textInput : nil,
+                    image: selectedImage,
+                    analysis: analysis,
+                    mealType: mealType,
+                    createdAt: mealDate
+                )
+            } else {
+               throw AppError.unknown(NSError(domain: "MealLogViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Repository not configured"]))
+            }
             
             step = .done
         } catch {
-            self.error = error.localizedDescription
+            self.error = AppError.from(error).localizedDescription
             step = .preview
         }
         

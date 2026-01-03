@@ -1,5 +1,7 @@
 import SwiftUI
 import Supabase
+import AuthenticationServices
+import CryptoKit
 
 // MARK: - Auth View Model
 /// Manages authentication state and operations
@@ -10,6 +12,9 @@ final class AuthViewModel: ObservableObject {
     @Published var isLoading = true
     @Published var error: String?
     @Published var currentUserEmail: String?
+    
+    // For Sign in with Apple
+    var currentNonce: String?
     
     // MARK: - Services
     private let authService = AuthService()
@@ -48,7 +53,7 @@ final class AuthViewModel: ObservableObject {
             isAuthenticated = true
             currentUserEmail = session.user.email
         } catch {
-            self.error = "Invalid email or password"
+            self.error = AppError.from(error).localizedDescription
         }
         
         isLoading = false
@@ -80,7 +85,56 @@ final class AuthViewModel: ObservableObject {
             isAuthenticated = true
             currentUserEmail = session.user.email
         } catch {
-            self.error = "Failed to create account. Please try again."
+            self.error = AppError.from(error).localizedDescription
+        }
+        
+        isLoading = false
+    }
+    
+    // MARK: - Sign in with Apple
+    /// Generate nonce for Sign in with Apple
+    func generateNonce() -> String {
+        let nonce = randomNonceString()
+        currentNonce = nonce
+        return nonce
+    }
+    
+    /// Get SHA256 hash of nonce for Apple
+    func sha256(_ input: String) -> String {
+        let inputData = Data(input.utf8)
+        let hashedData = SHA256.hash(data: inputData)
+        return hashedData.compactMap { String(format: "%02x", $0) }.joined()
+    }
+    
+    /// Handle Sign in with Apple result
+    func handleAppleSignIn(result: Result<ASAuthorization, Error>) async {
+        isLoading = true
+        error = nil
+        
+        switch result {
+        case .success(let authorization):
+            guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let identityTokenData = appleIDCredential.identityToken,
+                  let idToken = String(data: identityTokenData, encoding: .utf8),
+                  let nonce = currentNonce else {
+                self.error = "Failed to get Apple credentials"
+                isLoading = false
+                return
+            }
+            
+            do {
+                let session = try await authService.signInWithApple(idToken: idToken, nonce: nonce)
+                isAuthenticated = true
+                currentUserEmail = session.user.email
+            } catch {
+                self.error = AppError.from(error).localizedDescription
+            }
+            
+        case .failure(let error):
+            // Don't show error if user cancelled
+            if (error as NSError).code != ASAuthorizationError.canceled.rawValue {
+                self.error = AppError.from(error).localizedDescription
+            }
         }
         
         isLoading = false
@@ -105,5 +159,18 @@ final class AuthViewModel: ObservableObject {
     // MARK: - Clear Error
     func clearError() {
         error = nil
+    }
+    
+    // MARK: - Private Helpers
+    private func randomNonceString(length: Int = 32) -> String {
+        precondition(length > 0)
+        var randomBytes = [UInt8](repeating: 0, count: length)
+        let errorCode = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+        if errorCode != errSecSuccess {
+            fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
+        }
+        
+        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        return String(randomBytes.map { charset[Int($0) % charset.count] })
     }
 }

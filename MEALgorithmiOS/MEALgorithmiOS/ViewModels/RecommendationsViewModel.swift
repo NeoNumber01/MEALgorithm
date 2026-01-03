@@ -67,12 +67,34 @@ final class RecommendationsViewModel: ObservableObject {
                 goal: profile.goalDescription
             )
             
-            // Generate recommendations
+            // Build preferences from profile (matching Web implementation)
+            var preferences: [String] = []
+            if let foodPrefs = profile.foodPreferences, !foodPrefs.isEmpty {
+                preferences.append("Favorite: \(foodPrefs)")
+            }
+            if let dislikes = profile.foodDislikes, !dislikes.isEmpty {
+                preferences.append("Avoid: \(dislikes)")
+            }
+            if let restrictions = profile.dietaryRestrictions, !restrictions.isEmpty {
+                preferences.append("Restrictions: \(restrictions)")
+            }
+            if let notes = profile.customNotes, !notes.isEmpty {
+                preferences.append("Notes: \(notes)")
+            }
+            
+            // Extract frequent ingredients from meal history (matching Web implementation)
+            let mealDescriptions = weeklyMeals.compactMap { $0.textContent }
+            let frequentIngredients = extractFrequentIngredients(from: mealDescriptions)
+            if !frequentIngredients.isEmpty {
+                preferences.append("Often eats: \(frequentIngredients.joined(separator: ", "))")
+            }
+            
+            // Generate recommendations with full context
             recommendations = try await geminiService.generateRecommendations(
                 targetCalories: targets.calories,
                 recentAvgCalories: weeklyAvg,
                 goal: profile.goalDescription,
-                preferences: nil // TODO: Add food preferences
+                preferences: preferences.isEmpty ? nil : preferences
             )
             
             nextMealLoaded = true
@@ -100,8 +122,21 @@ final class RecommendationsViewModel: ObservableObject {
             let targets = NutritionCalculator.getTargets(from: profile)
             let consumedCalories = todayMeals.reduce(0) { $0 + ($1.analysis?.summary.calories ?? 0) }
             let eatenMealTypes = todayMeals.compactMap { $0.mealType?.rawValue }
-            let remainingMealTypes = ["breakfast", "lunch", "dinner", "snack"]
-                .filter { !eatenMealTypes.contains($0) }
+            
+            // Time-based meal filtering (matching Web implementation)
+            let currentHour = Calendar.current.component(.hour, from: Date())
+            let mealTimeWindows: [String: (start: Int, end: Int)] = [
+                "breakfast": (5, 10),
+                "lunch": (11, 14),
+                "dinner": (17, 21),
+                "snack": (0, 24)
+            ]
+            
+            let remainingMealTypes = mealTimeWindows.compactMap { (mealType, window) -> String? in
+                if eatenMealTypes.contains(mealType) { return nil }
+                if mealType == "snack" { return mealType }
+                return currentHour < window.end ? mealType : nil
+            }
             
             dayContext = DayPlanContext(
                 targetCalories: targets.calories,
@@ -111,13 +146,25 @@ final class RecommendationsViewModel: ObservableObject {
                 remainingMealTypes: remainingMealTypes
             )
             
-            // Generate day plan
+            // Build preferences from profile
+            var preferences: [String] = []
+            if let foodPrefs = profile.foodPreferences, !foodPrefs.isEmpty {
+                preferences.append("Favorite: \(foodPrefs)")
+            }
+            if let dislikes = profile.foodDislikes, !dislikes.isEmpty {
+                preferences.append("Avoid: \(dislikes)")
+            }
+            if let restrictions = profile.dietaryRestrictions, !restrictions.isEmpty {
+                preferences.append("Restrictions: \(restrictions)")
+            }
+            
+            // Generate day plan with preferences
             let result = try await geminiService.generateDayPlan(
                 targetCalories: targets.calories,
                 consumedCalories: consumedCalories,
                 eatenMealTypes: eatenMealTypes,
                 goal: profile.goalDescription,
-                preferences: nil
+                preferences: preferences.isEmpty ? nil : preferences
             )
             
             dayPlan = result.meals
@@ -143,5 +190,40 @@ final class RecommendationsViewModel: ObservableObject {
     func resetCache() {
         nextMealLoaded = false
         dayPlanLoaded = false
+    }
+    
+    // MARK: - Helper: Extract Frequent Ingredients
+    /// Analyzes meal descriptions to find commonly mentioned ingredients (matching Web implementation)
+    private func extractFrequentIngredients(from descriptions: [String]) -> [String] {
+        let combinedText = descriptions.joined(separator: " ").lowercased()
+        
+        // Common food keywords to look for (matching Web)
+        let foodKeywords = [
+            "chicken", "beef", "pork", "fish", "salmon", "tuna", "shrimp",
+            "rice", "pasta", "noodles", "bread", "potato",
+            "salad", "vegetables", "broccoli", "spinach", "tomato",
+            "eggs", "cheese", "yogurt", "milk",
+            "apple", "banana", "berries", "orange",
+            "tofu", "beans", "lentils",
+            "avocado", "nuts", "almonds",
+            "soup", "sandwich", "burger", "pizza", "sushi",
+            "coffee", "tea", "smoothie",
+            // Chinese food keywords
+            "鸡肉", "牛肉", "猪肉", "鱼", "虾",
+            "米饭", "面条", "面包",
+            "沙拉", "蔬菜", "西兰花", "菠菜",
+            "鸡蛋", "奶酪", "酸奶",
+            "苹果", "香蕉", "橙子",
+            "豆腐", "豆类"
+        ]
+        
+        var found: [String] = []
+        for keyword in foodKeywords {
+            if combinedText.contains(keyword) {
+                found.append(keyword)
+            }
+        }
+        
+        return Array(found.prefix(8)) // Return top 8 ingredients
     }
 }

@@ -34,9 +34,23 @@
 		E70523AD2F0876E6004CF2F3 /* MEALgorithmiOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MEALgorithmiOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		E70524502F087A00004CF2F3 /* Exceptions for "MEALgorithmiOS" folder in "MEALgorithmiOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Config/Secrets.xcconfig,
+				Info.plist,
+			);
+			target = E70523952F0876E4004CF2F3 /* MEALgorithmiOS */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		E70523982F0876E4004CF2F3 /* MEALgorithmiOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E70524502F087A00004CF2F3 /* Exceptions for "MEALgorithmiOS" folder in "MEALgorithmiOS" target */,
+			);
 			path = MEALgorithmiOS;
 			sourceTree = "<group>";
 		};
@@ -408,10 +422,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = MEALgorithmiOS/MEALgorithmiOS.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = HACRNL3284;
 				ENABLE_PREVIEWS = YES;
+				GEMINI_API_KEY = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MEALgorithmiOS/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -422,9 +438,8 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "Yuan-Tech.MEALgorithmiOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPABASE_URL = "https://snppngfvrjvnidwbgoyr.supabase.co";
 				SUPABASE_ANON_KEY = sb_publishable_CCP9OaprXgrQfJYYQylNPA_qMg3uk5q;
-				GEMINI_API_KEY = AIzaSyBuZhYiCJQCNAr83ZDzdtgUqxk4ycCbuKs;
+				SUPABASE_URL = "https://snppngfvrjvnidwbgoyr.supabase.co";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -436,10 +451,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = MEALgorithmiOS/MEALgorithmiOS.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = HACRNL3284;
 				ENABLE_PREVIEWS = YES;
+				GEMINI_API_KEY = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MEALgorithmiOS/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -450,9 +467,8 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "Yuan-Tech.MEALgorithmiOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPABASE_URL = "https://snppngfvrjvnidwbgoyr.supabase.co";
 				SUPABASE_ANON_KEY = sb_publishable_CCP9OaprXgrQfJYYQylNPA_qMg3uk5q;
-				GEMINI_API_KEY = AIzaSyBuZhYiCJQCNAr83ZDzdtgUqxk4ycCbuKs;
+				SUPABASE_URL = "https://snppngfvrjvnidwbgoyr.supabase.co";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

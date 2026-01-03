@@ -1,0 +1,43 @@
+# Offline-First & Robustness Architecture Guide
+
+## 1. Overview
+The iOS app has been upgraded to a "Robust Offline-First" architecture. This means:
+- **Source of Truth**: The local device database (SwiftData `SDMeal`).
+- **Sync**: A background `SyncEngine` handles uploading to Supabase.
+- **Resilience**: Failed requests are automatically retried with logic.
+
+## 2. Key Components
+
+### A. SwiftData (Local Database)
+- **Model**: `SDMeal` (wraps `MealAnalysis` as Data).
+- **Status**: Every meal has a `syncStatus` (.pending, .synced, .failed).
+
+### B. MealRepository
+- **Role**: The Mediator. ViewModels talk to this, NOT Supabase directly.
+- **Flow**: `saveMeal` -> Writes to SwiftData -> Triggers Sync.
+
+### C. SyncEngine
+- **Role**: Background worker.
+- **Triggers**:
+  1. New data saved (Repo notifies).
+  2. Network comes online (NetworkMonitor).
+- **Retry**: Uses exponential backoff (1s, 2s, 4s...) if upload fails.
+
+## 3. How to Test
+1. **Offline Mode**:
+   - Turn on Airplane Mode.
+   - Log a meal. It should appear instantly in Dashboard.
+   - Close app, reopen. Meal is still there.
+2. **Sync**:
+   - Turn off Airplane Mode.
+   - Watch console logs: `🔄 SyncEngine: Found 1 pending items`.
+   - Verify data appears in Supabase.
+
+## 4. Security
+- **API Keys**: Moved to Environment Variables / Info.plist.
+- **Hardcoding**: REMOVED. If keys are missing, App crashes (fail-safe).
+
+## 5. Adding New Features
+- Always create a SwiftData model (`SD...`) first.
+- Add methods to `Repository`.
+- Update `SyncEngine` to handle the new model.

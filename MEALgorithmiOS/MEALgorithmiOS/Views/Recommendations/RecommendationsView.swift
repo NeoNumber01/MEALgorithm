@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Recommendations View
 struct RecommendationsView: View {
     @StateObject private var viewModel = RecommendationsViewModel()
+    @State private var showPreferences = false
     
     var body: some View {
         NavigationStack {
@@ -22,6 +23,9 @@ struct RecommendationsView: View {
                     VStack(spacing: 20) {
                         // Header
                         headerSection
+                        
+                        // Preferences Panel Preview
+                        preferencesButton
                         
                         // View Toggle
                         viewToggle
@@ -47,7 +51,45 @@ struct RecommendationsView: View {
                     await viewModel.onViewModeChange()
                 }
             }
+            .sheet(isPresented: $showPreferences) {
+                PreferencesPanel(
+                    onSave: {
+                        viewModel.resetCache()
+                        Task {
+                            await viewModel.onViewModeChange()
+                        }
+                    }
+                )
+            }
         }
+    }
+    
+    // MARK: - Preferences Button
+    private var preferencesButton: some View {
+        Button {
+            showPreferences = true
+        } label: {
+            HStack {
+                Text("🍽️")
+                    .font(.title2)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Food Preferences")
+                        .fontWeight(.semibold)
+                    Text("Customize AI suggestions")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            .liquidGlass()
+        }
+        .foregroundColor(.primary)
     }
     
     // MARK: - Header Section
@@ -491,6 +533,193 @@ struct DaySummaryCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.appPrimary.opacity(0.2), lineWidth: 1)
         )
+    }
+}
+
+// MARK: - Preferences Panel
+struct PreferencesPanel: View {
+    let onSave: () -> Void
+    
+    @Environment(\.dismiss) var dismiss
+    @State private var foodPreferences = ""
+    @State private var foodDislikes = ""
+    @State private var dietaryRestrictions = ""
+    @State private var customNotes = ""
+    @State private var isSaving = false
+    @State private var isLoading = true
+    @State private var message: (type: String, text: String)?
+    
+    private let profileService = ProfileService()
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                LinearGradient(
+                    colors: [Color(.systemBackground), Color.green.opacity(0.05)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                
+                if isLoading {
+                    ProgressView("Loading preferences...")
+                } else {
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            // Info Card
+                            HStack {
+                                Text("💡")
+                                    .font(.title2)
+                                Text("Your preferences help us suggest meals you'll actually enjoy!")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding()
+                            .liquidGlass()
+                            
+                            // Message
+                            if let msg = message {
+                                HStack {
+                                    Image(systemName: msg.type == "success" ? "checkmark.circle" : "exclamationmark.circle")
+                                    Text(msg.text)
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(msg.type == "success" ? .green : .red)
+                                .padding()
+                                .background((msg.type == "success" ? Color.green : Color.red).opacity(0.1))
+                                .cornerRadius(8)
+                            }
+                            
+                            // Foods I Love
+                            PreferenceField(
+                                icon: "❤️",
+                                title: "Foods I Love",
+                                placeholder: "e.g., chicken wings, spicy food, Japanese cuisine...",
+                                text: $foodPreferences
+                            )
+                            
+                            // Foods I Dislike
+                            PreferenceField(
+                                icon: "👎",
+                                title: "Foods I Dislike",
+                                placeholder: "e.g., cilantro, raw onions, very sour foods...",
+                                text: $foodDislikes
+                            )
+                            
+                            // Dietary Restrictions
+                            PreferenceField(
+                                icon: "⚠️",
+                                title: "Dietary Restrictions",
+                                placeholder: "e.g., Vegetarian, Gluten-free, Nut allergy...",
+                                text: $dietaryRestrictions
+                            )
+                            
+                            // Special Requests
+                            PreferenceField(
+                                icon: "💬",
+                                title: "Special Requests",
+                                placeholder: "e.g., I want healthier eating, quick meals to cook...",
+                                text: $customNotes
+                            )
+                            
+                            // Save Button
+                            Button {
+                                Task {
+                                    await savePreferences()
+                                }
+                            } label: {
+                                if isSaving {
+                                    ProgressView()
+                                        .tint(.white)
+                                } else {
+                                    Text("Save Preferences")
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.appPrimary)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                            .disabled(isSaving)
+                        }
+                        .padding()
+                    }
+                }
+            }
+            .navigationTitle("Food Preferences")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+            .task {
+                await loadPreferences()
+            }
+        }
+    }
+    
+    private func loadPreferences() async {
+        isLoading = true
+        do {
+            let profile = try await profileService.getProfile()
+            foodPreferences = profile.foodPreferences ?? ""
+            foodDislikes = profile.foodDislikes ?? ""
+            dietaryRestrictions = profile.dietaryRestrictions ?? ""
+            customNotes = profile.customNotes ?? ""
+        } catch {
+            message = ("error", "Failed to load preferences")
+        }
+        isLoading = false
+    }
+    
+    private func savePreferences() async {
+        isSaving = true
+        message = nil
+        
+        do {
+            try await profileService.updatePreferences(
+                foodPreferences: foodPreferences,
+                foodDislikes: foodDislikes,
+                dietaryRestrictions: dietaryRestrictions,
+                customNotes: customNotes
+            )
+            message = ("success", "Preferences saved! Refresh suggestions to apply.")
+            onSave()
+        } catch {
+            message = ("error", "Failed to save preferences")
+        }
+        
+        isSaving = false
+    }
+}
+
+// MARK: - Preference Field
+struct PreferenceField: View {
+    let icon: String
+    let title: String
+    let placeholder: String
+    @Binding var text: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(icon)
+                Text(title)
+                    .font(.headline)
+            }
+            
+            TextField(placeholder, text: $text, axis: .vertical)
+                .lineLimit(2...4)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+        }
+        .padding()
+        .liquidGlass()
     }
 }
 

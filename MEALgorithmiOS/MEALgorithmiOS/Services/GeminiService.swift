@@ -4,7 +4,7 @@ import UIKit
 
 // MARK: - Gemini Service
 /// Handles AI-powered meal analysis using Google Gemini
-actor GeminiService {
+actor GeminiService: GeminiServiceProtocol {
     private let model: GenerativeModel
     
     // MARK: - System Prompt (matching web app)
@@ -168,28 +168,60 @@ actor GeminiService {
     }
     
     // MARK: - Generate AI Feedback
-    /// Generate personalized feedback based on daily progress
+    /// Generate personalized feedback based on daily progress (matching Web implementation)
     func generateFeedback(
         todayCalories: Int,
         weeklyAvgCalories: Int,
         targetCalories: Int,
         goal: String?
     ) async throws -> String {
+        // Calculate percentages (matching Web implementation)
+        let todayPercent = targetCalories > 0 ? Int(round(Double(todayCalories) / Double(targetCalories) * 100)) : 0
+        let weeklyPercent = targetCalories > 0 ? Int(round(Double(weeklyAvgCalories) / Double(targetCalories) * 100)) : 0
+        
         let prompt = """
-        You are a supportive nutrition coach AI.
+        You are a supportive and motivating nutritionist AI coach.
+        Based on the following data, provide a brief 1-2 sentence personalized feedback focused on TODAY's intake.
         
-        User's Progress:
-        - Today's calories: \(todayCalories) kcal
-        - Weekly average: \(weeklyAvgCalories) kcal
-        - Daily target: \(targetCalories) kcal
-        - Goal: \(goal ?? "General Health")
+        Today's Calories: \(todayCalories) kcal (\(todayPercent)% of target)
+        Weekly Average: \(weeklyAvgCalories) kcal (\(weeklyPercent)% of target)
+        Daily Target: \(targetCalories) kcal
+        User's Goal: \(goal ?? "General health and wellness")
         
-        Provide a brief, encouraging feedback message (2-3 sentences max).
-        Be specific about their progress. Output just the text, no JSON.
+        Guidelines:
+        - Focus primarily on TODAY's performance
+        - If today is on target (80-120%), be encouraging and celebrate
+        - If today is under target, suggest easy ways to add healthy calories
+        - If today is over target, be gentle and suggest balance
+        - Keep it positive and actionable
+        - Use an emoji at the start that matches the mood
+        - If there's no data today, encourage them to log their first meal
+        
+        Respond with just the feedback text, no JSON or markdown.
         """
         
         let response = try await model.generateContent(prompt)
-        return response.text ?? "Keep up the great work! You're making progress."
+        if let text = response.text {
+            return cleanFeedbackResponse(text)
+        }
+        return "🎯 Keep tracking your meals to get personalized feedback!"
+    }
+    
+    /// Clean AI response text (matching Web cleanResponse function)
+    private func cleanFeedbackResponse(_ text: String) -> String {
+        var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Remove markdown code blocks
+        cleaned = cleaned.replacingOccurrences(of: "```json", with: "")
+        cleaned = cleaned.replacingOccurrences(of: "```text", with: "")
+        cleaned = cleaned.replacingOccurrences(of: "```", with: "")
+        
+        // Remove surrounding quotes if present
+        if cleaned.hasPrefix("\"") && cleaned.hasSuffix("\"") {
+            cleaned = String(cleaned.dropFirst().dropLast())
+        }
+        
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     // MARK: - Parsing Helpers
@@ -236,6 +268,59 @@ actor GeminiService {
             cleaned = String(cleaned.dropLast(3))
         }
         return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    // MARK: - Generate Statistics Insight (matching Web implementation)
+    /// Generate AI insight for statistics view based on weekly data
+    func generateStatisticsInsight(
+        periodLabel: String,
+        totalDays: Int,
+        daysWithMeals: Int,
+        totalMeals: Int,
+        avgCalories: Int,
+        avgProtein: Int,
+        avgCarbs: Int,
+        avgFat: Int,
+        targetCalories: Int,
+        goalDescription: String?
+    ) async throws -> String {
+        let avgPercent = targetCalories > 0 ? Int(round(Double(avgCalories) / Double(targetCalories) * 100)) : 0
+        let trackingRate = totalDays > 0 ? Int(round(Double(daysWithMeals) / Double(totalDays) * 100)) : 0
+        
+        let prompt = """
+        You are a supportive nutritionist AI analyzing a user's eating habits over a time period.
+        Based on the following statistics, provide 2-3 sentences of insightful feedback and actionable advice.
+        
+        Period: \(periodLabel)
+        Days in Period: \(totalDays)
+        Days with Logged Meals: \(daysWithMeals) (\(trackingRate)% tracking rate)
+        Total Meals: \(totalMeals)
+        
+        Daily Averages:
+        - Calories: \(avgCalories) kcal (\(avgPercent)% of \(targetCalories) kcal target)
+        - Protein: \(avgProtein)g
+        - Carbs: \(avgCarbs)g
+        - Fat: \(avgFat)g
+        
+        User's Goal: \(goalDescription ?? "General health and wellness")
+        
+        Guidelines:
+        - Analyze patterns and trends they should be aware of
+        - Highlight what they're doing well (be specific)
+        - Give one concrete, actionable suggestion for improvement
+        - If tracking rate is low, encourage more consistent logging
+        - Consider macro balance (protein for muscle, not just calories)
+        - Use an emoji at the start
+        - Be encouraging and insightful, not preachy
+        
+        Respond with just the feedback text, no JSON or markdown.
+        """
+        
+        let response = try await model.generateContent(prompt)
+        if let text = response.text {
+            return cleanFeedbackResponse(text)
+        }
+        return "📊 Keep logging your meals consistently to get detailed insights about your eating patterns!"
     }
 }
 

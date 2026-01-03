@@ -32,25 +32,19 @@ struct LiquidGlassModifier: ViewModifier {
     }
     
     func body(content: Content) -> some View {
-        if #available(iOS 26, *) {
-            // iOS 26+ with native Liquid Glass
-            content
-                .glassEffect(.regular)
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        } else {
-            // Fallback for iOS 17-25
-            content
-                .background(.ultraThinMaterial)
-                .background(
-                    Color.white.opacity(intensity.opacity)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-        }
+        // Using ultraThinMaterial for glassmorphism effect
+        // Note: iOS 26 will have native .glassEffect() when available
+        content
+            .background(.ultraThinMaterial)
+            .background(
+                Color.white.opacity(intensity.opacity)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
     }
 }
 
@@ -59,6 +53,11 @@ extension View {
     /// Apply Liquid Glass effect with default settings
     func liquidGlass() -> some View {
         modifier(LiquidGlassModifier())
+    }
+    
+    /// Apply Liquid Glass effect with custom corner radius
+    func liquidGlass(cornerRadius: CGFloat) -> some View {
+        modifier(LiquidGlassModifier(cornerRadius: cornerRadius))
     }
     
     /// Apply Liquid Glass effect with custom settings
