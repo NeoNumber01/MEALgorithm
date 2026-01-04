@@ -46,7 +46,7 @@ actor AuthService: AuthServiceProtocol {
         // Create the OAuth URL with the app's custom URL scheme for callback
         let redirectURL = URL(string: "mealgorithm://auth/callback")!
         
-        let url = try await client.auth.getOAuthSignInURL(
+        let url = try client.auth.getOAuthSignInURL(
             provider: provider.supabaseProvider,
             redirectTo: redirectURL
         )

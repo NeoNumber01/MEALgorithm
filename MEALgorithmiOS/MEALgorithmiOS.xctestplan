@@ -1,0 +1,43 @@
+{
+  "configurations" : [
+    {
+      "id" : "4F084001-D74F-42D7-B421-E5D38673DC20",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "environmentVariableEntries" : [
+      {
+        "key" : "GEMINI_API_KEY",
+        "value" : "AIzaSyDmgv_-n7XN0I3O3bfzc-mBIAERvYSL-RQ"
+      }
+    ],
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:MEALgorithmiOS.xcodeproj",
+      "identifier" : "E70523952F0876E4004CF2F3",
+      "name" : "MEALgorithmiOS"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:MEALgorithmiOS.xcodeproj",
+        "identifier" : "E70523A22F0876E6004CF2F3",
+        "name" : "MEALgorithmiOSTests"
+      }
+    },
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:MEALgorithmiOS.xcodeproj",
+        "identifier" : "E70523AC2F0876E6004CF2F3",
+        "name" : "MEALgorithmiOSUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

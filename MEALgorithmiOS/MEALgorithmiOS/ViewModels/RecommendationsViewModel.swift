@@ -309,7 +309,7 @@ final class RecommendationsViewModel: ObservableObject {
         // Use the auth session from local storage (synchronous)
         // The Supabase SDK stores the session locally, so we can try to read it directly
         // For simplicity, we use the auth listener's cached user or return nil
-        if let session = try? SupabaseManager.shared.client.auth.currentSession {
+        if let session = SupabaseManager.shared.client.auth.currentSession {
             return session.user.id.uuidString
         }
         return nil

@@ -123,7 +123,7 @@ actor MealService: MealServiceProtocol {
         
         try await client.storage
             .from("meal_images")
-            .upload(path: fileName, file: imageData, options: FileOptions(contentType: "image/jpeg"))
+            .upload(fileName, data: imageData, options: FileOptions(contentType: "image/jpeg"))
         
         return fileName
     }

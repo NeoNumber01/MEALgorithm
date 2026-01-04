@@ -74,3 +74,4 @@ docs/learning_notes/
 
 # Block shared schemes with secrets
 *.xcscheme
+docs/setup_guides/

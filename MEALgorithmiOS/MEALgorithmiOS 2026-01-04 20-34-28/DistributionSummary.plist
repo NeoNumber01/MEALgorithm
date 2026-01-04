@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>MEALgorithmiOS.ipa</key>
+	<array>
+		<dict>
+			<key>architectures</key>
+			<array>
+				<string>arm64</string>
+			</array>
+			<key>buildNumber</key>
+			<string>1</string>
+			<key>certificate</key>
+			<dict>
+				<key>SHA1</key>
+				<string>9DEFDD6AD54EDA994BB8B3AAB6F05756F1BC41D5</string>
+				<key>dateExpires</key>
+				<string>04.01.27</string>
+				<key>type</key>
+				<string>Cloud Managed Apple Distribution</string>
+			</dict>
+			<key>entitlements</key>
+			<dict>
+				<key>application-identifier</key>
+				<string>HACRNL3284.Yuan-Tech.MEALgorithmiOS</string>
+				<key>com.apple.developer.team-identifier</key>
+				<string>HACRNL3284</string>
+				<key>get-task-allow</key>
+				<false/>
+			</dict>
+			<key>name</key>
+			<string>MEALgorithmiOS.app</string>
+			<key>profile</key>
+			<dict>
+				<key>UUID</key>
+				<string>bd245e6e-e99a-41eb-89c4-5e2453dbdc9b</string>
+				<key>dateExpires</key>
+				<string>04.01.27</string>
+				<key>name</key>
+				<string>iOS Team Ad Hoc Provisioning Profile: Yuan-Tech.MEALgorithmiOS</string>
+			</dict>
+			<key>team</key>
+			<dict>
+				<key>id</key>
+				<string>HACRNL3284</string>
+				<key>name</key>
+				<string>Chen Yuanhao</string>
+			</dict>
+			<key>versionNumber</key>
+			<string>1.0.0</string>
+		</dict>
+	</array>
+</dict>
+</plist>

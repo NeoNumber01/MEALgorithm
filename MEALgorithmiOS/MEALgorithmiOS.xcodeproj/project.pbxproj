@@ -32,6 +32,7 @@
 		E70523962F0876E4004CF2F3 /* MEALgorithmiOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MEALgorithmiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E70523A32F0876E6004CF2F3 /* MEALgorithmiOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MEALgorithmiOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E70523AD2F0876E6004CF2F3 /* MEALgorithmiOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MEALgorithmiOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E773F5612F0AF77900FD395D /* MEALgorithmiOS.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = MEALgorithmiOS.xctestplan; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -99,6 +100,7 @@
 		E705238D2F0876E4004CF2F3 = {
 			isa = PBXGroup;
 			children = (
+				E773F5612F0AF77900FD395D /* MEALgorithmiOS.xctestplan */,
 				E70523982F0876E4004CF2F3 /* MEALgorithmiOS */,
 				E70523A62F0876E6004CF2F3 /* MEALgorithmiOSTests */,
 				E70523B02F0876E6004CF2F3 /* MEALgorithmiOSUITests */,
@@ -446,7 +448,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "Yuan-Tech.MEALgorithmiOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -474,7 +476,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "Yuan-Tech.MEALgorithmiOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

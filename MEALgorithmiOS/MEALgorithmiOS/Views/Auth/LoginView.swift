@@ -124,6 +124,7 @@ struct LoginView: View {
                             }
                             
                             // Divider
+                            /*
                             HStack {
                                 Rectangle()
                                     .fill(Color.secondary.opacity(0.3))
@@ -170,6 +171,7 @@ struct LoginView: View {
                                     }
                                 }
                             )
+                            */
                         }
                         .padding(24)
                         .liquidGlass()
@@ -184,6 +186,7 @@ struct LoginView: View {
             .sheet(isPresented: $showSignUp) {
                 SignUpView()
             }
+            /*
             .sheet(isPresented: Binding(
                 get: { authViewModel.oauthURL != nil },
                 set: { if !$0 { authViewModel.clearOAuthURL() } }
@@ -198,6 +201,7 @@ struct LoginView: View {
                     }
                 }
             }
+            */
             .onChange(of: showSignUp) { _, _ in
                 authViewModel.clearError()
             }

@@ -10,6 +10,10 @@
 	<key>GEMINI_API_KEY</key>
 	<string>$(GEMINI_API_KEY)</string>
 	
+	<!-- Bypass Export Compliance (Uses Standard Encryption/HTTPS) -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	
 	<!-- URL Scheme for OAuth callbacks -->
 	<key>CFBundleURLTypes</key>
 	<array>
@@ -42,6 +46,8 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
