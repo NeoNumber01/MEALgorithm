@@ -10,6 +10,7 @@ struct MealLogView: View {
     @Namespace private var inputModeAnimation
     @State private var successScale: CGFloat = 0.5
     @State private var selectedTip: TipType?
+    @FocusState private var isTextEditorFocused: Bool
     
     enum TipType: Identifiable {
         case photoTips
@@ -38,6 +39,17 @@ struct MealLogView: View {
             }
             .navigationTitle("Log Meal")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        isTextEditorFocused = false
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.appPrimary)
+                }
+            }
             .sheet(isPresented: $showCamera) {
                 CameraView(image: $viewModel.selectedImage)
             }
@@ -150,7 +162,8 @@ struct MealLogView: View {
     private var headerBadge: some View {
         VStack(spacing: Spacing.small) {
             HStack(spacing: Spacing.small) {
-                Text("📸")
+                Image(systemName: "camera.viewfinder")
+                    .font(.system(size: 14, weight: .semibold))
                 Text("AI-Powered Analysis")
                     .font(.system(size: 14, weight: .semibold))
             }
@@ -169,6 +182,7 @@ struct MealLogView: View {
                 .foregroundColor(.white.opacity(0.6))
         }
         .padding(.top, Spacing.medium)
+        .smartZoomEffect()
     }
     
     // MARK: - Error Banner
@@ -201,7 +215,8 @@ struct MealLogView: View {
                     HapticManager.shared.impact(style: .light)
                 } label: {
                     HStack(spacing: 6) {
-                        Text(mode == .text ? "📝" : "📷")
+                        Image(systemName: mode == .text ? "text.alignleft" : "camera.fill")
+                            .font(.system(size: 12))
                         Text(mode == .text ? "Text" : "Photo")
                             .font(.system(size: 14, weight: .semibold))
                     }
@@ -241,6 +256,7 @@ struct MealLogView: View {
                 .scrollContentBackground(.hidden)
                 .frame(height: 140)
                 .padding(Spacing.medium)
+                .focused($isTextEditorFocused)
             
             if viewModel.textInput.isEmpty {
                 Text("Describe your meal... e.g., 'I had a grilled chicken salad with olive oil dressing'")
@@ -257,6 +273,7 @@ struct MealLogView: View {
             RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
         )
+        .smartZoomEffect()
     }
     
     // MARK: - Image Input Area
@@ -273,6 +290,7 @@ struct MealLogView: View {
                         RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous)
                             .stroke(Color.white.opacity(0.2), lineWidth: 1)
                     )
+                    .smartZoomEffect()
                 
                 Button {
                     viewModel.selectedImage = nil
@@ -384,6 +402,7 @@ struct MealLogView: View {
                             style: StrokeStyle(lineWidth: 2, dash: [10])
                         )
                 )
+                .smartZoomEffect()
             }
         }
     }
@@ -393,7 +412,8 @@ struct MealLogView: View {
         HStack(spacing: Spacing.medium) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
-                    Text("📅")
+                    Image(systemName: "calendar")
+                        .font(.system(size: 12))
                     Text("Date")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.6))
@@ -406,7 +426,8 @@ struct MealLogView: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
-                    Text("⏰")
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 12))
                     Text("Time")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.6))
@@ -424,6 +445,7 @@ struct MealLogView: View {
             RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
+        .smartZoomEffect()
     }
     
     // MARK: - Meal Type Section
@@ -463,7 +485,8 @@ struct MealLogView: View {
                     }
                 } else {
                     HStack(spacing: Spacing.small) {
-                        Text("🔍")
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 16, weight: .semibold))
                         Text("Analyze with AI")
                             .font(.system(size: 17, weight: .semibold))
                     }
@@ -485,6 +508,7 @@ struct MealLogView: View {
         .disabled(viewModel.isAnalyzing || (viewModel.inputMode == .text ? viewModel.textInput.isEmpty : viewModel.selectedImage == nil))
         .opacity((viewModel.isAnalyzing || (viewModel.inputMode == .text ? viewModel.textInput.isEmpty : viewModel.selectedImage == nil)) ? 0.6 : 1)
         .cardPressEffect()
+        .smartZoomEffect()
     }
     
     // MARK: - Tips Section
@@ -495,7 +519,7 @@ struct MealLogView: View {
             GridItem(.flexible(), spacing: Spacing.small)
         ], spacing: Spacing.small) {
             PremiumTipCard(
-                icon: "📷",
+                systemIcon: "camera.fill",
                 title: "Photo Tips",
                 message: "Clear, well-lit"
             ) {
@@ -503,7 +527,7 @@ struct MealLogView: View {
             }
             
             PremiumTipCard(
-                icon: "✍️",
+                systemIcon: "text.cursor",
                 title: "Be Specific",
                 message: "Add portions"
             ) {
@@ -511,7 +535,7 @@ struct MealLogView: View {
             }
             
             PremiumTipCard(
-                icon: "🎯",
+                systemIcon: "target",
                 title: "Consistency",
                 message: "Log all meals"
             ) {
@@ -587,6 +611,7 @@ struct MealLogView: View {
         .padding(Spacing.large)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
+        .smartZoomEffect()
     }
     
     // MARK: - Food Items Card
@@ -640,6 +665,7 @@ struct MealLogView: View {
             RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
         )
+        .smartZoomEffect()
     }
     
     // MARK: - Nutrition Summary Grid
@@ -714,6 +740,7 @@ struct MealLogView: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
         .gradientBorder(colors: [.green.opacity(0.6), .teal.opacity(0.3)], lineWidth: 1.5)
+        .smartZoomEffect()
     }
     
     // MARK: - Action Buttons
@@ -740,6 +767,7 @@ struct MealLogView: View {
                 )
             }
             .cardPressEffect()
+            .smartZoomEffect()
             
             // Confirm & Save Button
             Button {
@@ -767,6 +795,7 @@ struct MealLogView: View {
                 .neonGlow(color: .green, radius: 10)
             }
             .cardPressEffect()
+            .smartZoomEffect()
         }
     }
     
@@ -866,7 +895,8 @@ struct MealLogView: View {
 
 // MARK: - Premium Tip Card
 struct PremiumTipCard: View {
-    let icon: String
+    var icon: String? = nil
+    var systemIcon: String? = nil
     let title: String
     let message: String
     let onTap: () -> Void
@@ -877,8 +907,20 @@ struct PremiumTipCard: View {
             HapticManager.shared.impact(style: .light)
         } label: {
             VStack(spacing: 6) {
-                Text(icon)
-                    .font(.title3)
+                if let systemIcon = systemIcon {
+                    Image(systemName: systemIcon)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.appPrimary, .appSecondary],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                } else if let icon = icon {
+                    Text(icon)
+                        .font(.title3)
+                }
                 Text(title)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white)

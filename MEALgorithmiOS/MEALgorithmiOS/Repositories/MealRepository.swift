@@ -12,11 +12,11 @@ final class MealRepository {
     
     init(
         context: ModelContext,
-        syncEngine: SyncEngine = .shared,
+        syncEngine: SyncEngine? = nil,
         mealService: MealServiceProtocol = MealService()
     ) {
         self.context = context
-        self.syncEngine = syncEngine
+        self.syncEngine = syncEngine ?? SyncEngine.shared
         self.mealService = mealService
     }
     
@@ -91,5 +91,41 @@ final class MealRepository {
         )
         let sdMeals = try context.fetch(descriptor)
         return sdMeals.compactMap { $0.toDomain() }
+    }
+    
+    /// Get Weekly Meals (Last 7 Days)
+    func getWeeklyMeals() throws -> [Meal] {
+        let calendar = Calendar.current
+        // Start from 6 days ago (total 7 days including today)
+        guard let start = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: Date())),
+              let end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: Date())) else {
+            return []
+        }
+        
+        let descriptor = FetchDescriptor<SDMeal>(
+            predicate: #Predicate<SDMeal> { $0.createdAt >= start && $0.createdAt < end },
+            sortBy: [SortDescriptor(\.createdAt)]
+        )
+        let sdMeals = try context.fetch(descriptor)
+        return sdMeals.compactMap { $0.toDomain() }
+    }
+    
+    /// Delete Meal
+    func deleteMeal(id: UUID) throws {
+        let descriptor = FetchDescriptor<SDMeal>(
+            predicate: #Predicate<SDMeal> { $0.id == id }
+        )
+        
+        if let mealToDelete = try context.fetch(descriptor).first {
+             context.delete(mealToDelete)
+             // SyncEngine will pick up deletion if we track deleted IDs or if we handle it directly here.
+             // For V1 simple logic: We might need to tell SyncEngine to delete remote.
+             // But if we delete from DB, SyncEngine might lose track if it relies on DB rows.
+             // Often better to mark as deleted (soft delete) or handle immediate remote delete.
+             
+             Task {
+                 try? await mealService.deleteMeal(id: id)
+             }
+        }
     }
 }

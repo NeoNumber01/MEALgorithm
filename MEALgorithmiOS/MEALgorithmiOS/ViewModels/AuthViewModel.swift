@@ -32,13 +32,31 @@ final class AuthViewModel: ObservableObject {
         defer { isLoading = false }
         
         do {
-            if let session = try await authService.getSession() {
-                isAuthenticated = true
-                currentUserEmail = session.user.email
-            } else {
-                isAuthenticated = false
+            // Add timeout for session check
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    if let session = try await self.authService.getSession() {
+                        await MainActor.run {
+                            self.isAuthenticated = true
+                            self.currentUserEmail = session.user.email
+                        }
+                    } else {
+                        await MainActor.run {
+                            self.isAuthenticated = false
+                        }
+                    }
+                }
+                
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 10 * 1_000_000_000) // 10s timeout for initial check
+                    throw AppError.unknown("Session check timed out")
+                }
+                
+                try await group.next()
+                group.cancelAll()
             }
         } catch {
+            print("⚠️ AuthViewModel: Session check failed - \(error)")
             isAuthenticated = false
         }
     }
@@ -54,15 +72,42 @@ final class AuthViewModel: ObservableObject {
         isLoading = true
         error = nil
         
-        do {
-            let session = try await authService.signIn(email: email, password: password)
-            isAuthenticated = true
-            currentUserEmail = session.user.email
-        } catch {
-            self.error = AppError.from(error).localizedDescription
-        }
+        // Ensure loading is reset no matter what
+        defer { isLoading = false }
         
-        isLoading = false
+        do {
+            print("🔑 AuthViewModel: Attempting sign in for \(email)")
+            
+            // Add timeout for sign in
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    let session = try await self.authService.signIn(email: email, password: password)
+                    await MainActor.run {
+                        print("✅ AuthViewModel: Sign in successful")
+                        self.isAuthenticated = true
+                        self.currentUserEmail = session.user.email
+                    }
+                }
+                
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 15 * 1_000_000_000) // 15s timeout
+                    throw AppError.unknown("Sign in timed out. Please check your internet connection.")
+                }
+                
+                try await group.next()
+                group.cancelAll()
+            }
+        } catch {
+            print("❌ AuthViewModel: Sign in failed - \(error)")
+            // Extract meaningful error message
+            let errorMessage = AppError.from(error).localizedDescription
+            // Simplify timeout message
+            if errorMessage.contains("timed out") {
+                self.error = "Request timed out. Please try again."
+            } else {
+                self.error = errorMessage
+            }
+        }
     }
     
     // MARK: - Sign Up
@@ -86,15 +131,42 @@ final class AuthViewModel: ObservableObject {
         isLoading = true
         error = nil
         
-        do {
-            let session = try await authService.signUp(email: email, password: password)
-            isAuthenticated = true
-            currentUserEmail = session.user.email
-        } catch {
-            self.error = AppError.from(error).localizedDescription
-        }
+        // Ensure loading is reset no matter what
+        defer { isLoading = false }
         
-        isLoading = false
+        do {
+            print("🔑 AuthViewModel: Attempting sign up for \(email)")
+            
+            // Add timeout for sign up
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    let session = try await self.authService.signUp(email: email, password: password)
+                    await MainActor.run {
+                        print("✅ AuthViewModel: Sign up successful")
+                        self.isAuthenticated = true
+                        self.currentUserEmail = session.user.email
+                    }
+                }
+                
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 15 * 1_000_000_000) // 15s timeout
+                    throw AppError.unknown("Sign up timed out. Please check your internet connection.")
+                }
+                
+                try await group.next()
+                group.cancelAll()
+            }
+        } catch {
+            print("❌ AuthViewModel: Sign up failed - \(error)")
+             // Extract meaningful error message
+            let errorMessage = AppError.from(error).localizedDescription
+            // Simplify timeout message
+            if errorMessage.contains("timed out") {
+                self.error = "Request timed out. Please try again."
+            } else {
+                self.error = errorMessage
+            }
+        }
     }
     
     // MARK: - Sign in with Apple

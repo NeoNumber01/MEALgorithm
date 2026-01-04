@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - Dashboard View (Modern Redesign)
 /// Apple Design Award 级别的 Dashboard 界面
@@ -6,6 +7,7 @@ import SwiftUI
 struct DashboardView_Modern: View {
     @StateObject private var viewModel = DashboardViewModel()
     @EnvironmentObject var networkMonitor: NetworkMonitor
+    @Environment(\.modelContext) private var modelContext
     @Namespace private var heroAnimation
     
     var body: some View {
@@ -33,6 +35,7 @@ struct DashboardView_Modern: View {
                 }
             }
             .task {
+                viewModel.configure(modelContext: modelContext)
                 await viewModel.loadData()
             }
             .onReceive(NotificationCenter.default.publisher(for: .mealDidSave)) { _ in
@@ -260,8 +263,15 @@ struct DashboardView_Modern: View {
                     
                     // Center Content
                     VStack(spacing: 4) {
-                        Text("🔥")
-                            .font(.system(size: 36))
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 36, weight: .semibold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.caloriesStart, .caloriesEnd],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
                         
                         Text("\(viewModel.todayTotals.calories)")
                             .font(.system(size: 44, weight: .black, design: .rounded))
@@ -299,7 +309,7 @@ struct DashboardView_Modern: View {
         ], spacing: Spacing.medium) {
             BentoMacroCard(
                 title: "Protein",
-                icon: "🥩",
+                systemIcon: "fish.fill",
                 current: viewModel.todayTotals.protein,
                 target: viewModel.targets.protein,
                 colors: [.proteinStart, .proteinEnd]
@@ -309,7 +319,7 @@ struct DashboardView_Modern: View {
             
             BentoMacroCard(
                 title: "Carbs",
-                icon: "🍞",
+                systemIcon: "leaf.fill",
                 current: viewModel.todayTotals.carbs,
                 target: viewModel.targets.carbs,
                 colors: [.carbsStart, .carbsEnd]
@@ -319,7 +329,7 @@ struct DashboardView_Modern: View {
             
             BentoMacroCard(
                 title: "Fat",
-                icon: "🧈",
+                systemIcon: "drop.fill",
                 current: viewModel.todayTotals.fat,
                 target: viewModel.targets.fat,
                 colors: [.fatStart, .fatEnd]
@@ -345,8 +355,9 @@ struct DashboardView_Modern: View {
                         .frame(width: 44, height: 44)
                         .neonGlow(color: .green, radius: 10)
                     
-                    Text("🤖")
-                        .font(.title2)
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(.white)
                 }
                 
                 Text("AI Coach Insight")
@@ -384,8 +395,15 @@ struct DashboardView_Modern: View {
     private var timelineMealsSection: some View {
         VStack(alignment: .leading, spacing: Spacing.medium) {
             HStack {
-                Text("🍽️")
-                    .font(.title2)
+                Image(systemName: "fork.knife")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.caloriesStart, .caloriesEnd],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                 Text("Today's Meals")
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
@@ -409,8 +427,9 @@ struct DashboardView_Modern: View {
             } else if viewModel.todayMeals.isEmpty {
                 // Empty State
                 VStack(spacing: Spacing.medium) {
-                    Text("🍽️")
-                        .font(.system(size: 48))
+                    Image(systemName: "fork.knife")
+                        .font(.system(size: 48, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
                     
                     Text("No meals logged yet")
                         .font(.system(size: 17, weight: .semibold))
@@ -455,8 +474,9 @@ struct DashboardView_Modern: View {
             } label: {
                 VStack(spacing: Spacing.medium) {
                     HStack {
-                        Text("📊")
-                            .font(.title2)
+                        Image(systemName: "chart.bar.fill")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundColor(.appPrimary)
                         Text("Weekly Summary")
                             .font(.system(size: 20, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
@@ -519,8 +539,9 @@ struct DashboardView_Modern: View {
             } label: {
                 VStack(alignment: .leading, spacing: Spacing.medium) {
                     HStack {
-                        Text("📈")
-                            .font(.title2)
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundColor(.green)
                         Text("Weekly Nutrition")
                             .font(.system(size: 20, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
@@ -565,8 +586,15 @@ struct DashboardView_Modern: View {
     private var aiInsightsCard: some View {
         VStack(alignment: .leading, spacing: Spacing.medium) {
             HStack {
-                Text("🤖")
-                    .font(.title2)
+                Image(systemName: "brain.head.profile")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.appPrimary, .green],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                 Text("AI Insights")
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
@@ -626,7 +654,7 @@ struct DashboardView_Modern: View {
 // MARK: - Bento Macro Card
 struct BentoMacroCard: View {
     let title: String
-    let icon: String
+    let systemIcon: String
     let current: Int
     let target: Int
     let colors: [Color]
@@ -657,8 +685,11 @@ struct BentoMacroCard: View {
                         .rotationEffect(.degrees(-90))
                         .animation(.spring(response: 0.8, dampingFraction: 0.7), value: progress)
                     
-                    Text(icon)
-                        .font(.system(size: 20))
+                    Image(systemName: systemIcon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
                 }
                 .frame(width: 50, height: 50)
                 .neonGlow(color: colors.last ?? .white, radius: 8)

@@ -16,15 +16,20 @@ actor ProfileService: ProfileServiceProtocol {
         let session = try await client.auth.session
         let userId = session.user.id
         
-        let response: Profile = try await client
-            .from("profiles")
-            .select()
-            .eq("id", value: userId)
-            .single()
-            .execute()
-            .value
-        
-        return response
+        do {
+            let response: Profile = try await client
+                .from("profiles")
+                .select()
+                .eq("id", value: userId)
+                .single()
+                .execute()
+                .value
+            
+            return response
+        } catch {
+            print("👤 ProfileService: Failed to fetch profile. Error: \(error)")
+            throw ProfileError.notFound
+        }
     }
     
     // MARK: - Update Profile

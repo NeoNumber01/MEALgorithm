@@ -1,5 +1,6 @@
 import Foundation
 import Supabase
+import Auth
 
 // MARK: - Supabase Manager
 /// Singleton for managing Supabase client connection
@@ -29,41 +30,44 @@ final class SupabaseManager {
             print("📦 SupabaseManager: Using Info.plist")
         } else {
             // CRITICAL: No API Keys found.
-            // In production, this should likely show a fatal error screen or crash.
-            // We removed the hardcoded fallback for security.
             fatalError("🚨 FATAL: Supabase API Keys are missing! Set SUPABASE_URL and SUPABASE_ANON_KEY in Environment or Info.plist.")
         }
         
-        guard let url = URL(string: supabaseURL) else {
-            fatalError("Invalid SUPABASE_URL: \(supabaseURL)")
+        // Sanitize inputs
+        let rawURL = supabaseURL.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\"", with: "")
+        let sanitizedKey = supabaseKey.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\"", with: "")
+        
+        print("📦 RAW URL: '\(supabaseURL)'")
+        print("📦 CLEAN URL: '\(rawURL)'")
+        
+        // Ensure scheme is present
+        let sanitizedURL = rawURL.hasPrefix("https://") ? rawURL : "https://\(rawURL)"
+        print("📦 FINAL URL: '\(sanitizedURL)'")
+        
+        guard let url = URL(string: sanitizedURL), let host = url.host else {
+            fatalError("🚨 Invalid SUPABASE_URL: '\(sanitizedURL)'. Host is nil.")
         }
         
-        print("📦 SupabaseManager: Connecting to \(url.host ?? "unknown")")
+        print("📦 SupabaseManager: Connecting to \(host)")
         
-        // Create custom URLSession configuration to help with iOS Simulator network issues
-        // Cloudflare (used by Supabase) enables HTTP/3 by default, which can cause
-        // "network connection was lost" errors (-1005) on iOS Simulator
+        // Create custom URLSession configuration
         let urlSessionConfiguration = URLSessionConfiguration.default
         
-        // Stability settings to help with QUIC/HTTP3 issues
-        urlSessionConfiguration.multipathServiceType = .none
+        // STANDARD SETTINGS (Strategy 1: Simplify for Debugging)
+        // We removed 'waitsForConnectivity = true' and 'multipathServiceType'
+        // to prevent the "Silent Hang" issue where the OS holds the request indefinitely.
         urlSessionConfiguration.timeoutIntervalForRequest = 30
         urlSessionConfiguration.timeoutIntervalForResource = 60
-        urlSessionConfiguration.waitsForConnectivity = true
         
-        // These settings help ensure connection attempts proceed
-        urlSessionConfiguration.allowsConstrainedNetworkAccess = true
-        urlSessionConfiguration.allowsExpensiveNetworkAccess = true
-        
-        // Note: If you encounter "network connection was lost" errors on Simulator:
-        // 1. Reset the iOS Simulator: Device > Erase All Content and Settings
-        // 2. Or test on a real device instead
-        print("📦 SupabaseManager: Custom URLSession configured")
+        print("📦 SupabaseManager: Custom URLSession configured (Simplified Strategy 1)")
         
         client = SupabaseClient(
             supabaseURL: url,
-            supabaseKey: supabaseKey,
+            supabaseKey: sanitizedKey,
             options: SupabaseClientOptions(
+                auth: .init(
+                    emitLocalSessionAsInitialSession: true
+                ),
                 global: SupabaseClientOptions.GlobalOptions(
                     session: URLSession(configuration: urlSessionConfiguration)
                 )

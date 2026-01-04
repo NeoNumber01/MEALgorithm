@@ -151,16 +151,32 @@ struct LoadingView: View {
 
 // MARK: - Empty State View
 struct EmptyStateView: View {
-    let icon: String
+    let icon: String?
+    let systemIcon: String?
     let title: String
     let message: String
     var actionTitle: String? = nil
     var action: (() -> Void)? = nil
     
+    init(icon: String? = nil, systemIcon: String? = nil, title: String, message: String, actionTitle: String? = nil, action: (() -> Void)? = nil) {
+        self.icon = icon
+        self.systemIcon = systemIcon
+        self.title = title
+        self.message = message
+        self.actionTitle = actionTitle
+        self.action = action
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
-            Text(icon)
-                .font(.system(size: 60))
+            if let systemIcon = systemIcon {
+                Image(systemName: systemIcon)
+                    .font(.system(size: 48, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
+            } else if let icon = icon {
+                Text(icon)
+                    .font(.system(size: 60))
+            }
             
             Text(title)
                 .font(.system(.title2, design: .rounded))

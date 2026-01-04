@@ -27,6 +27,13 @@ final class SettingsViewModel: ObservableObject {
     
     // User Info
     @Published var userEmail: String = ""
+    @Published var fullName: String = ""
+    
+    // Food Preferences (for AI recommendations)
+    @Published var foodPreferences: String = ""
+    @Published var foodDislikes: String = ""
+    @Published var dietaryRestrictions: String = ""
+    @Published var customNotes: String = ""
     
     // MARK: - Change Tracking
     private var initialSnapshot: ProfileSnapshot?
@@ -58,6 +65,11 @@ final class SettingsViewModel: ObservableObject {
         let carbsTarget: Int
         let fatTarget: Int
         let useCustomTargets: Bool
+        let fullName: String
+        let foodPreferences: String
+        let foodDislikes: String
+        let dietaryRestrictions: String
+        let customNotes: String
     }
     
     private func captureSnapshot() -> ProfileSnapshot {
@@ -72,7 +84,12 @@ final class SettingsViewModel: ObservableObject {
             proteinTarget: proteinTarget,
             carbsTarget: carbsTarget,
             fatTarget: fatTarget,
-            useCustomTargets: useCustomTargets
+            useCustomTargets: useCustomTargets,
+            fullName: fullName,
+            foodPreferences: foodPreferences,
+            foodDislikes: foodDislikes,
+            dietaryRestrictions: dietaryRestrictions,
+            customNotes: customNotes
         )
     }
     
@@ -91,6 +108,11 @@ final class SettingsViewModel: ObservableObject {
             gender = profile.gender ?? .male
             activityLevel = profile.activityLevel ?? .moderate
             goalDescription = profile.goalDescription ?? ""
+            fullName = profile.fullName ?? ""
+            foodPreferences = profile.foodPreferences ?? ""
+            foodDislikes = profile.foodDislikes ?? ""
+            dietaryRestrictions = profile.dietaryRestrictions ?? ""
+            customNotes = profile.customNotes ?? ""
             
             // Targets
             if let calories = profile.calorieTarget {
@@ -177,7 +199,11 @@ final class SettingsViewModel: ObservableObject {
             activityLevel: activityLevel.rawValue,
             proteinTarget: proteinTarget,
             carbsTarget: carbsTarget,
-            fatTarget: fatTarget
+            fatTarget: fatTarget,
+            foodPreferences: foodPreferences.isEmpty ? nil : foodPreferences,
+            foodDislikes: foodDislikes.isEmpty ? nil : foodDislikes,
+            dietaryRestrictions: dietaryRestrictions.isEmpty ? nil : dietaryRestrictions,
+            customNotes: customNotes.isEmpty ? nil : customNotes
         )
         
         do {

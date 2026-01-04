@@ -102,6 +102,40 @@ struct NutritionInfo: Codable, Equatable {
             fat: lhs.fat + rhs.fat
         )
     }
+    
+    // Custom decoding to handle AI returning Floats/Doubles
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Helper to decode Int or Double and round to Int
+        func decodeIntOrDouble(forKey key: CodingKeys) throws -> Int {
+            if let intValue = try? container.decode(Int.self, forKey: key) {
+                return intValue
+            } else if let doubleValue = try? container.decode(Double.self, forKey: key) {
+                return Int(round(doubleValue))
+            } else {
+                // If missing or null, default to 0 to be resilient
+                return 0
+            }
+        }
+        
+        calories = try decodeIntOrDouble(forKey: .calories)
+        protein = try decodeIntOrDouble(forKey: .protein)
+        carbs = try decodeIntOrDouble(forKey: .carbs)
+        fat = try decodeIntOrDouble(forKey: .fat)
+    }
+    
+    // Default init need to be explicit if we have custom decoding
+    init(calories: Int, protein: Int, carbs: Int, fat: Int) {
+        self.calories = calories
+        self.protein = protein
+        self.carbs = carbs
+        self.fat = fat
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case calories, protein, carbs, fat
+    }
 }
 
 // MARK: - Meal Create DTO

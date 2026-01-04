@@ -5,6 +5,11 @@ import SwiftUI
 struct AboutSettingsView: View {
     @Environment(\.openURL) private var openURL
     
+    // Sheet states
+    @State private var showingHelpFAQ = false
+    @State private var showingPrivacyPolicy = false
+    @State private var showingTermsOfService = false
+    
     private let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     private let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     
@@ -53,10 +58,10 @@ struct AboutSettingsView: View {
                 // Support Section
                 Section {
                     Button {
-                        // TODO: Open help center
+                        showingHelpFAQ = true
                         HapticManager.shared.impact(style: .light)
                     } label: {
-                        SettingsRow(icon: "❓", title: "Help & FAQ")
+                        SettingsRow(systemIcon: "questionmark.circle.fill", title: "Help & FAQ")
                     }
                     
                     Button {
@@ -65,14 +70,14 @@ struct AboutSettingsView: View {
                         }
                         HapticManager.shared.impact(style: .light)
                     } label: {
-                        SettingsRow(icon: "📧", title: "Contact Support")
+                        SettingsRow(systemIcon: "envelope.fill", title: "Contact Support")
                     }
                     
                     Button {
                         requestAppStoreReview()
                         HapticManager.shared.notification(type: .success)
                     } label: {
-                        SettingsRow(icon: "⭐", title: "Rate the App")
+                        SettingsRow(systemIcon: "star.fill", title: "Rate the App")
                     }
                 } header: {
                     Text("Support")
@@ -84,21 +89,17 @@ struct AboutSettingsView: View {
                 // Legal Section
                 Section {
                     Button {
-                        if let url = URL(string: "https://mealgorithm.app/privacy") {
-                            openURL(url)
-                        }
+                        showingPrivacyPolicy = true
                         HapticManager.shared.impact(style: .light)
                     } label: {
-                        SettingsRow(icon: "🔒", title: "Privacy Policy")
+                        SettingsRow(systemIcon: "lock.shield.fill", title: "Privacy Policy")
                     }
                     
                     Button {
-                        if let url = URL(string: "https://mealgorithm.app/terms") {
-                            openURL(url)
-                        }
+                        showingTermsOfService = true
                         HapticManager.shared.impact(style: .light)
                     } label: {
-                        SettingsRow(icon: "📋", title: "Terms of Service")
+                        SettingsRow(systemIcon: "doc.text.fill", title: "Terms of Service")
                     }
                 } header: {
                     Text("Legal")
@@ -127,6 +128,16 @@ struct AboutSettingsView: View {
         }
         .navigationTitle("About")
         .navigationBarTitleDisplayMode(.inline)
+        // MARK: - Sheets
+        .sheet(isPresented: $showingHelpFAQ) {
+            HelpFAQSheet()
+        }
+        .sheet(isPresented: $showingPrivacyPolicy) {
+            PrivacyPolicySheet()
+        }
+        .sheet(isPresented: $showingTermsOfService) {
+            TermsOfServiceSheet()
+        }
     }
     
     // MARK: - Nebula Background
@@ -175,8 +186,309 @@ struct AboutSettingsView: View {
     }
 }
 
+// MARK: - Help & FAQ Sheet
+struct HelpFAQSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.appBackground.ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        FAQItem(
+                            question: "How does AI meal analysis work?",
+                            answer: "Our AI analyzes your meal photos and descriptions to estimate nutritional content. It uses advanced image recognition and natural language processing to identify foods and calculate calories, protein, carbs, and fat."
+                        )
+                        
+                        FAQItem(
+                            question: "How accurate are the calorie estimates?",
+                            answer: "AI estimates are approximate and should be used as a guide. For best results, provide clear photos and detailed descriptions. Accuracy improves when you include portion sizes."
+                        )
+                        
+                        FAQItem(
+                            question: "How are my nutrition goals calculated?",
+                            answer: "Your goals are calculated using the Mifflin-St Jeor equation based on your height, weight, age, gender, and activity level. You can also set custom targets in Settings → Goals & Targets."
+                        )
+                        
+                        FAQItem(
+                            question: "Can I edit or delete logged meals?",
+                            answer: "Yes! Tap on any meal in your history to view details. From there, you can delete the meal. Editing features are coming soon."
+                        )
+                        
+                        FAQItem(
+                            question: "How do meal recommendations work?",
+                            answer: "Our AI considers your remaining daily calories and macros, your food preferences, dietary restrictions, and previous meals to suggest personalized meal ideas."
+                        )
+                        
+                        FAQItem(
+                            question: "Is my data private?",
+                            answer: "Absolutely. Your data is securely stored and never shared with third parties. We only use your information to provide personalized nutrition insights."
+                        )
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Help & FAQ")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.white.opacity(0.6))
+                            .font(.title2)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - FAQ Item Component
+private struct FAQItem: View {
+    let question: String
+    let answer: String
+    @State private var isExpanded = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    Text(question)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.leading)
+                    
+                    Spacer()
+                    
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundColor(.appPrimary)
+                        .font(.caption)
+                }
+            }
+            
+            if isExpanded {
+                Text(answer)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.7))
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.ultraThinMaterial.opacity(0.5))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
+    }
+}
+
+// MARK: - Privacy Policy Sheet
+struct PrivacyPolicySheet: View {
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.appBackground.ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Last Updated: January 2026")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.5))
+                        
+                        PolicySection(
+                            title: "Information We Collect",
+                            content: """
+                            • Account information (email address)
+                            • Profile data (height, weight, age, dietary preferences)
+                            • Meal logs and photos you submit
+                            • App usage analytics (anonymized)
+                            """
+                        )
+                        
+                        PolicySection(
+                            title: "How We Use Your Data",
+                            content: """
+                            • Provide personalized nutrition tracking
+                            • Generate AI-powered meal recommendations
+                            • Improve our services and algorithms
+                            • Send important account notifications
+                            """
+                        )
+                        
+                        PolicySection(
+                            title: "Data Storage & Security",
+                            content: """
+                            Your data is encrypted and stored securely using industry-standard practices. We use Supabase for database services with row-level security policies to ensure only you can access your data.
+                            """
+                        )
+                        
+                        PolicySection(
+                            title: "Third-Party Services",
+                            content: """
+                            • Google Gemini AI for meal analysis
+                            • Supabase for authentication and storage
+                            • Apple for Sign in with Apple
+                            
+                            These services have their own privacy policies.
+                            """
+                        )
+                        
+                        PolicySection(
+                            title: "Your Rights",
+                            content: """
+                            You can request to:
+                            • Access your personal data
+                            • Delete your account and all data
+                            • Export your data
+                            
+                            Contact support@mealgorithm.app for requests.
+                            """
+                        )
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Privacy Policy")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.white.opacity(0.6))
+                            .font(.title2)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Terms of Service Sheet
+struct TermsOfServiceSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.appBackground.ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Last Updated: January 2026")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.5))
+                        
+                        PolicySection(
+                            title: "Acceptance of Terms",
+                            content: """
+                            By using MEALgorithm, you agree to these terms. If you do not agree, please do not use the app.
+                            """
+                        )
+                        
+                        PolicySection(
+                            title: "Service Description",
+                            content: """
+                            MEALgorithm provides AI-powered nutritional tracking and meal recommendations. Our estimates are for informational purposes only and should not replace professional medical or dietary advice.
+                            """
+                        )
+                        
+                        PolicySection(
+                            title: "User Responsibilities",
+                            content: """
+                            • Provide accurate profile information
+                            • Use the app for personal, non-commercial purposes
+                            • Do not attempt to manipulate or abuse the service
+                            • Report any bugs or security issues
+                            """
+                        )
+                        
+                        PolicySection(
+                            title: "Disclaimer",
+                            content: """
+                            MEALgorithm is not a medical device. Nutritional estimates are approximate. Always consult healthcare professionals for dietary decisions, especially if you have health conditions.
+                            """
+                        )
+                        
+                        PolicySection(
+                            title: "Limitation of Liability",
+                            content: """
+                            MEALgorithm is provided "as is" without warranties. We are not liable for any damages arising from the use of this app or reliance on its nutritional data.
+                            """
+                        )
+                        
+                        PolicySection(
+                            title: "Changes to Terms",
+                            content: """
+                            We may update these terms. Continued use after changes constitutes acceptance. Check this page periodically for updates.
+                            """
+                        )
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Terms of Service")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.white.opacity(0.6))
+                            .font(.title2)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Policy Section Component
+private struct PolicySection: View {
+    let title: String
+    let content: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+            
+            Text(content)
+                .font(.system(size: 14))
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.ultraThinMaterial.opacity(0.5))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
+    }
+}
+
 #Preview {
     NavigationStack {
         AboutSettingsView()
     }
 }
+

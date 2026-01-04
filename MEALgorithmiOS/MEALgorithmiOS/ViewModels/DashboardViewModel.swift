@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - Dashboard View Model
 /// Manages dashboard data including meals, nutrition totals, and AI feedback
@@ -108,6 +109,7 @@ final class DashboardViewModel: ObservableObject {
                 let value = dayMeals.reduce(0) { total, meal in
                     let summary = meal.analysis?.summary
                     switch nutrient {
+                    case "calories": return total + (summary?.calories ?? 0)
                     case "protein": return total + (summary?.protein ?? 0)
                     case "carbs": return total + (summary?.carbs ?? 0)
                     case "fat": return total + (summary?.fat ?? 0)
@@ -136,10 +138,12 @@ final class DashboardViewModel: ObservableObject {
     
     // MARK: - Services
     // MARK: - Services
+    // MARK: - Services
     private let mealService: MealServiceProtocol
     private let profileService: ProfileServiceProtocol
     private let geminiService: GeminiServiceProtocol
-    private let cacheService = CacheService.shared // Singleton, tough to mock unless we wrap it or protocol it.
+    private let cacheService = CacheService.shared
+    private var mealRepository: MealRepository?
     
     init(
         mealService: MealServiceProtocol = MealService(),
@@ -149,6 +153,41 @@ final class DashboardViewModel: ObservableObject {
         self.mealService = mealService
         self.profileService = profileService
         self.geminiService = geminiService
+        
+        setupObservers()
+    }
+    
+    /// Configure with ModelContext (called from View)
+    func configure(modelContext: ModelContext) {
+        self.mealRepository = MealRepository(context: modelContext, mealService: mealService)
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    private func setupObservers() {
+        // Reload when a new meal is saved
+        NotificationCenter.default.addObserver(
+            forName: .mealDidSave,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { [weak self] in
+                await self?.loadData(forceRefresh: true)
+            }
+        }
+        
+        // Reload when a meal is deleted (if triggered externally)
+        NotificationCenter.default.addObserver(
+            forName: .mealDidDelete,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { [weak self] in
+                await self?.loadData(forceRefresh: true)
+            }
+        }
     }
     
     // MARK: - Load Data
@@ -177,9 +216,34 @@ final class DashboardViewModel: ObservableObject {
     }
     
     private func loadEducationData() {
+        // Prepare fallback data
+        let fallbackData: [NutritionEducationItem] = [
+            NutritionEducationItem(
+                id: "calories",
+                title: "Calories",
+                content: "Calories are a unit of energy that measures how much fuel your body gets from food. Your Total Daily Energy Expenditure (TDEE) accounts for your activity level. Understanding your calorie needs is the first step in weight management."
+            ),
+            NutritionEducationItem(
+                id: "protein",
+                title: "Protein",
+                content: "Protein is a fundamental building block of cells, tissues, and organs, essential for muscle growth and repair. Quality protein sources include meat, fish, eggs, dairy, and legumes."
+            ),
+            NutritionEducationItem(
+                id: "carbs",
+                title: "Carbohydrates",
+                content: "Carbohydrates are your body's primary energy source. Complex carbs (whole grains, veggies) provide sustained energy and fiber, while simple carbs provide quick energy."
+            ),
+            NutritionEducationItem(
+                id: "fat",
+                title: "Fat",
+                content: "Fat is a dense energy source vital for cell health and hormone production. Focus on healthy unsaturated fats like those in avocados, nuts, and olive oil."
+            )
+        ]
+        
         guard let url = Bundle.main.url(forResource: "nutrition_info", withExtension: "json") else {
-            print("Nutrition info file not found")
-            return 
+            print("⚠️ Nutrition info file not found, using fallback data")
+            self.nutritionEducation = fallbackData
+            return
         }
         
         do {
@@ -187,7 +251,8 @@ final class DashboardViewModel: ObservableObject {
             let items = try JSONDecoder().decode([NutritionEducationItem].self, from: data)
             self.nutritionEducation = items
         } catch {
-            print("Failed to load nutrition education: \(error)")
+            print("⚠️ Failed to load nutrition education: \(error), using fallback data")
+            self.nutritionEducation = fallbackData
         }
     }
     
@@ -237,29 +302,101 @@ final class DashboardViewModel: ObservableObject {
     
     /// Load fresh data from network
     private func loadFreshData() async {
+        // Load Profile (Resilient)
+        var fetchedProfile: Profile? = nil
         do {
-            // Load profile and meals in parallel
-            async let profileTask = profileService.getProfile()
+            fetchedProfile = try await profileService.getProfile()
+            self.currentProfile = fetchedProfile
+        } catch {
+            print("⚠️ Dashboard: Profile fetch failed (\(error)). Using default targets.")
+            // Don't throw here; continue to load meals.
+            // Consider defaulting currentProfile to nil or a detailed error state if needed.
+        }
+        
+        do {
+            // Load Meals in parallel (Prefer Local Repository for offline support)
+            // If repository is configured, use it for immediate local data (including pending syncs)
+            
+            var localTodayMeals: [Meal] = []
+            
+            // 1. Try Local First (Offline/Pending)
+            if let repository = mealRepository {
+                do {
+                    localTodayMeals = try repository.getTodayMeals()
+                    print("📊 Dashboard: Loaded \(localTodayMeals.count) meals from Local Repository")
+                } catch {
+                    print("⚠️ Dashboard: Local fetch failed: \(error)")
+                }
+            }
+            
+            // 2. Load Remote (Background Sync / Historical)
+            // We use repository for weekly meals too if available, to support offline charts
+            
             async let mealsTask = mealService.getTodayMeals()
             async let weeklyMealsTask = mealService.getWeeklyMeals()
             
-            let (profile, todayMeals, weeklyMeals) = try await (profileTask, mealsTask, weeklyMealsTask)
+            // Optimistic Update: If we have local meals, show them immediately
+            if !localTodayMeals.isEmpty {
+                 self.todayMeals = localTodayMeals
+                 self.todayTotals = localTodayMeals.totalNutrition
+            }
             
-            // Update state
-            self.todayMeals = todayMeals
-            self.weeklyMeals = weeklyMeals
-            self.todayTotals = todayMeals.totalNutrition
-            self.targets = NutritionCalculator.getTargets(from: profile)
-            self.currentProfile = profile
+            // Try to load local weekly meals first
+            if let repository = mealRepository {
+                 do {
+                     let localWeekly = try repository.getWeeklyMeals()
+                     if !localWeekly.isEmpty {
+                         self.weeklyMeals = localWeekly
+                     }
+                 } catch {
+                     print("⚠️ Dashboard: Local weekly fetch failed: \(error)")
+                 }
+            }
+
+            let (remoteTodayMeals, weeklyMeals) = try await (mealsTask, weeklyMealsTask)
+            
+            // If we have Repository, we rely on it for Today's view to show pending items.
+            if mealRepository != nil {
+                // Refresh local again in case SyncEngine updated something in background
+                if let updatedLocal = try? mealRepository?.getTodayMeals() {
+                    self.todayMeals = updatedLocal
+                    self.todayTotals = updatedLocal.totalNutrition
+                }
+                 // Refresh weekly local too
+                if let updatedWeekly = try? mealRepository?.getWeeklyMeals(), !updatedWeekly.isEmpty {
+                    self.weeklyMeals = updatedWeekly
+                } else {
+                     // If local fails or empty, fallback to remote
+                     self.weeklyMeals = weeklyMeals
+                }
+            } else {
+                // Fallback to remote if no repo configured
+                self.todayMeals = remoteTodayMeals
+                self.todayTotals = remoteTodayMeals.totalNutrition
+                self.weeklyMeals = weeklyMeals
+            }
+            
+            // Use profile if available, else standard defaults
+            if let profile = fetchedProfile {
+                self.targets = NutritionCalculator.getTargets(from: profile)
+            } else {
+                // Keep existing defaults (2000 kcal etc defined in init)
+                print("⚠️ Dashboard: Using default nutrition targets.")
+            }
             
             isLoading = false
             
             // Generate AI feedback in background
-            await generateFeedback(
-                todayCalories: todayTotals.calories,
-                weeklyMeals: weeklyMeals,
-                profile: profile
-            )
+            // We pass a dummy profile or the fetched one. 
+            // If fetchedProfile is nil, we can't generate personalized goal feedback easily, 
+            // but we can still try with generic params or skip.
+            if let profile = fetchedProfile {
+                await generateFeedback(
+                    todayCalories: todayTotals.calories,
+                    weeklyMeals: weeklyMeals,
+                    profile: profile
+                )
+            }
             
             // Cache the data after successful load
             cacheService.cacheDashboardData(
@@ -306,13 +443,20 @@ final class DashboardViewModel: ObservableObject {
         isDeletingMeal = true
         
         do {
-            try await mealService.deleteMeal(id: meal.id)
+            // Priority: Delete from Local Repository (Source of Truth)
+            if let repository = mealRepository {
+                try repository.deleteMeal(id: meal.id)
+            } else {
+                // Fallback direct remote delete (legacy/non-persisted mode)
+                try await mealService.deleteMeal(id: meal.id)
+            }
             
-            // Remove from local state
+            // Remove from local state immediately for UI responsiveness
             todayMeals.removeAll { $0.id == meal.id }
+            weeklyMeals.removeAll { $0.id == meal.id } // Also remove from weekly if present
             todayTotals = todayMeals.totalNutrition
             
-            // 通知其他视图数据已更新
+            // Notify other views
             NotificationCenter.default.post(name: .mealDidDelete, object: nil)
             
             // Close modal if this meal was selected
@@ -320,6 +464,7 @@ final class DashboardViewModel: ObservableObject {
                 selectedMeal = nil
             }
         } catch {
+            print("❌ Delete failed: \(error)")
             self.error = "Failed to delete meal"
         }
         

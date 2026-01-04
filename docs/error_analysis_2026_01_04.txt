@@ -1,0 +1,45 @@
+[故障分析] iOS 网络请求超时与假死 (Infinite Loading)
+日期: 2026-01-04
+关键词: Race Condition (竞态条件), Head-of-Line Blocking (队头阻塞), URLSession
+
+## 1. 现象描述 (The Symptom)
+用户点击登录后，界面一直显示 "LoadingView"，约15秒后提示 "Sign in timed out"。
+控制台日志显示：
+- `SupabaseManager: Custom URLSession configured`
+- 15秒后 `AuthViewModel: Sign in failed - unknown("Sign in timed out...")`
+
+## 2. 根因分析 (Root Cause Analysis)
+这不是服务器慢，也不是网络真的断了，而是代码逻辑创造了一个"死锁"陷阱。
+
+### 核心矛盾 (The Conflict)
+1. **SupabaseManager (网络层)**: 配置了 `waitsForConnectivity = true`。
+   - 这告诉 iOS 系统："如果网络看起来不稳定（比如在模拟器里常见的情况），不要报错，把请求挂起 (Suspend)，一直等到网络变好为止。"
+   - 结果：请求被系统"冻结"在队列里，一直在等待完美的网络状态，**不返回成功，也不返回失败**。
+
+2. **AuthViewModel (业务层)**: 设置了 15秒的 "人工超时" (Manual Timeout)。
+   - 你写了一个 `Task.sleep` 倒计时。
+   - 当网络层在"傻等"的时候，15秒倒计时结束了。
+   - 业务层判定超时，抛出错误，强制结束了流程。
+
+**结论**: 网络请求从来没有真正发送出去，或者发送了但系统在等握手，而我们在上层把它杀死了。我们看到的 Error 是我们自己抛出的，掩盖了底层的真实情况。
+
+## 3. 技术概念 (Technical Concepts)
+
+### Race Condition (竞态条件)
+你的代码里有两个"赛跑者"：
+1. 网络请求任务
+2. 15秒倒计时任务
+在这个Bug里，因为网络层被配置为"无限等待"，倒计时任务总是赢家。这就是为什么你永远只能看到 "Timeout" 错误，而看不到真正的网络错误（比如 DNS 解析失败，或 SSL 握手失败）。
+
+### Head-of-Line Blocking (队头阻塞)
+虽然严格来说这里是 Client-side blocking，但原理类似。之前的配置试图通过 HTTP/3 (QUIC) 优化连接，但在 iOS 模拟器环境中，复杂的网络协议栈（如 Multipath TCP）容易因为环境限制而无法建立，导致请求堵在出口出不去。
+
+## 4. 解决方案 (The Solution)
+**策略**: 简化配置 (Simplify Configuration)
+我们移除了 `waitsForConnectivity` 和复杂的 HTTP/3 配置，回归最标准的 `URLSession.default`。
+- **效果**: 如果网络不好，系统会立刻抛出 `NSURLErrorNetworkConnectionLost` 或类似错误。
+- **好处**: "Fail Fast" (快速失败)。让错误立刻暴露出来，而不是挂起等待，这样我们就能立刻知道是网络不通，还是配置错了。
+
+## 5. 经验总结 (Key Takeaways)
+1. **开发环境 vs 生产环境**: 模拟器的网络栈和真机不同，过于激进的优化配置（如 HTTP/3, Multipath）在模拟器上容易失效。
+2. **慎用 `waitsForConnectivity`**: 除非你的 App 是后台上传大文件，否则不要让 UI 操作（如登录）无限等待网络。用户更希望立刻看到"网络错误"，而不是一直转圈。

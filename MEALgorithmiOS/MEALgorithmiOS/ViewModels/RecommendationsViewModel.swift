@@ -244,7 +244,8 @@ final class RecommendationsViewModel: ObservableObject {
     struct CachedData<T: Codable>: Codable {
         let items: T
         let timestamp: Date
-        let context: String? // Optional scope/context hash
+        let cacheDate: String  // "yyyy-MM-dd" format for day-based cache invalidation
+        let userId: String?    // User ID for cache isolation between users
     }
     
     struct CachedDayPlan: Codable {
@@ -259,7 +260,14 @@ final class RecommendationsViewModel: ObservableObject {
     }
 
     private func saveToCache<T: Codable>(_ data: T, key: String) {
-        let cached = CachedData(items: data, timestamp: Date(), context: nil)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let todayString = dateFormatter.string(from: Date())
+        
+        // Get current user ID for cache isolation
+        let userId = getCurrentUserId()
+        
+        let cached = CachedData(items: data, timestamp: Date(), cacheDate: todayString, userId: userId)
         if let encoded = try? JSONEncoder().encode(cached) {
             userDefaults.set(encoded, forKey: key)
         }
@@ -271,8 +279,38 @@ final class RecommendationsViewModel: ObservableObject {
             return nil
         }
         
-        if Date().timeIntervalSince(decoded.timestamp) < cacheValidityDuration {
-            return decoded.items
+        // Time-based invalidation
+        if Date().timeIntervalSince(decoded.timestamp) >= cacheValidityDuration {
+            return nil
+        }
+        
+        // User ID validation - ensure cache belongs to current user
+        let currentUserId = getCurrentUserId()
+        if let cachedUserId = decoded.userId, cachedUserId != currentUserId {
+            return nil
+        }
+        
+        // Date-based invalidation for Day Plan cache (invalidate if day changed)
+        if key == cacheKeyDayPlan {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            let todayString = dateFormatter.string(from: Date())
+            if decoded.cacheDate != todayString {
+                print("DEBUG: Day plan cache invalidated - date changed")
+                return nil
+            }
+        }
+        
+        return decoded.items
+    }
+    
+    /// Get current user ID for cache isolation (synchronous using local storage)
+    private func getCurrentUserId() -> String? {
+        // Use the auth session from local storage (synchronous)
+        // The Supabase SDK stores the session locally, so we can try to read it directly
+        // For simplicity, we use the auth listener's cached user or return nil
+        if let session = try? SupabaseManager.shared.client.auth.currentSession {
+            return session.user.id.uuidString
         }
         return nil
     }

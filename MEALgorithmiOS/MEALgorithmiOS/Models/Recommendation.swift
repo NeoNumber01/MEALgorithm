@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Recommendation Model
 struct Recommendation: Codable, Identifiable, Equatable {
-    var id: UUID { UUID() }
+    var id: UUID = UUID()
     var name: String
     var description: String
     var reason: String
@@ -18,7 +18,7 @@ struct Recommendation: Codable, Identifiable, Equatable {
 
 // MARK: - Day Plan Meal
 struct DayPlanMeal: Codable, Identifiable, Equatable {
-    var id: UUID { UUID() }
+    var id: UUID = UUID()
     var mealType: String
     var name: String
     var description: String

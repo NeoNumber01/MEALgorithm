@@ -39,6 +39,7 @@ struct RecommendationsView: View {
             }
             .navigationTitle("Suggestions")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .sheet(isPresented: $showPreferences) {
                 PreferencesPanel(
                     onSave: {
@@ -66,6 +67,15 @@ struct RecommendationsView: View {
                 Task {
                     await viewModel.onViewModeChange()
                 }
+            }
+            .onChange(of: viewModel.viewMode) { _, _ in
+                Task {
+                    await viewModel.onViewModeChange()
+                }
+            }
+            .task {
+                // Initial load when view appears
+                await viewModel.onViewModeChange()
             }
         }
     }
@@ -127,7 +137,8 @@ struct RecommendationsView: View {
         HStack {
             // AI Badge
             HStack(spacing: Spacing.small) {
-                Text("💡")
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .semibold))
                 Text("Powered by Gemini AI")
                     .font(.system(size: 14, weight: .semibold))
             }
@@ -201,8 +212,9 @@ struct RecommendationsView: View {
                         .frame(width: 44, height: 44)
                         .neonGlow(color: .green, radius: 8)
                     
-                    Text("🍽️")
-                        .font(.title2)
+                    Image(systemName: "fork.knife")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -229,6 +241,7 @@ struct RecommendationsView: View {
             )
         }
         .cardPressEffect()
+        .smartZoomEffect()
     }
     
     // MARK: - Premium View Toggle
@@ -242,7 +255,8 @@ struct RecommendationsView: View {
                     HapticManager.shared.impact(style: .light)
                 } label: {
                     HStack(spacing: 6) {
-                        Text(mode == .nextMeal ? "🍽️" : "📅")
+                        Image(systemName: mode == .nextMeal ? "fork.knife" : "calendar")
+                            .font(.system(size: 12))
                         Text(mode == .nextMeal ? "Next Meal" : "Day Plan")
                             .font(.system(size: 14, weight: .semibold))
                         
@@ -291,6 +305,16 @@ struct RecommendationsView: View {
                 ForEach(0..<3, id: \.self) { _ in
                     SkeletonRecommendationCard()
                 }
+            } else if let error = viewModel.error, viewModel.viewMode == .nextMeal {
+                // Error State
+                PremiumErrorCard(
+                    message: error,
+                    onRetry: {
+                        Task {
+                            await viewModel.refreshNextMeal()
+                        }
+                    }
+                )
             } else if viewModel.recommendations.isEmpty {
                 PremiumEmptyStateCard(
                     icon: "🍽️",
@@ -348,6 +372,16 @@ struct RecommendationsView: View {
                 ForEach(0..<3, id: \.self) { _ in
                     SkeletonDayPlanCard()
                 }
+            } else if let error = viewModel.error, viewModel.viewMode == .dayPlan {
+                // Error State
+                PremiumErrorCard(
+                    message: error,
+                    onRetry: {
+                        Task {
+                            await viewModel.refreshDayPlan()
+                        }
+                    }
+                )
             } else if viewModel.dayPlan.isEmpty && viewModel.dayContext == nil {
                 PremiumEmptyStateCard(
                     icon: "📅",
@@ -437,14 +471,18 @@ struct PremiumContextCard: View {
     
     var body: some View {
         VStack(spacing: Spacing.medium) {
-            Text("✨ Personalized For You")
-                .font(.system(size: 17, weight: .bold))
-                .foregroundColor(.white)
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .bold))
+                Text("Personalized For You")
+                    .font(.system(size: 17, weight: .bold))
+            }
+            .foregroundColor(.white)
             
             HStack(spacing: Spacing.medium) {
-                ContextStatItem(value: "\(targetCalories)", label: "Daily Target", icon: "🎯")
-                ContextStatItem(value: "\(recentAvg)", label: "Avg/Meal", icon: "📊")
-                ContextStatItem(value: goal, label: "Goal", icon: "💪")
+                ContextStatItem(value: "\(targetCalories)", label: "Daily Target", systemIcon: "target")
+                ContextStatItem(value: "\(recentAvg)", label: "Avg/Meal", systemIcon: "chart.bar.fill")
+                ContextStatItem(value: goal, label: "Goal", systemIcon: "figure.run")
             }
         }
         .padding(Spacing.medium)
@@ -458,6 +496,7 @@ struct PremiumContextCard: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
         .neonGlow(color: .appPrimary, radius: 15)
+        .smartZoomEffect()
     }
 }
 
@@ -465,7 +504,8 @@ struct PremiumContextCard: View {
 struct ContextStatItem: View {
     let value: String
     let label: String
-    let icon: String
+    var icon: String? = nil
+    var systemIcon: String? = nil
     
     var body: some View {
         VStack(spacing: 4) {
@@ -487,12 +527,12 @@ struct PremiumRecommendationCard: View {
     let recommendation: Recommendation
     let rank: Int
     
-    private var rankEmoji: String {
+    private var rankColor: Color {
         switch rank {
-        case 1: return "🥇"
-        case 2: return "🥈"
-        case 3: return "🥉"
-        default: return "🍽️"
+        case 1: return Color(red: 1.0, green: 0.84, blue: 0.0) // Gold
+        case 2: return Color(red: 0.75, green: 0.75, blue: 0.75) // Silver
+        case 3: return Color(red: 0.8, green: 0.5, blue: 0.2) // Bronze
+        default: return .green
         }
     }
     
@@ -504,8 +544,9 @@ struct PremiumRecommendationCard: View {
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
                 Spacer()
-                Text(rankEmoji)
-                    .font(.title2)
+                Image(systemName: rank <= 3 ? "medal.fill" : "fork.knife")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundColor(rankColor)
             }
             
             // Description
@@ -515,7 +556,9 @@ struct PremiumRecommendationCard: View {
             
             // Reason Badge
             HStack(spacing: Spacing.small) {
-                Text("💡")
+                Image(systemName: "lightbulb.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(.green)
                 Text(recommendation.reason)
                     .font(.system(size: 13))
                     .foregroundColor(.white.opacity(0.9))
@@ -540,6 +583,7 @@ struct PremiumRecommendationCard: View {
                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
         )
         .cardPressEffect()
+        .smartZoomEffect()
     }
 }
 
@@ -606,6 +650,7 @@ struct PremiumDayProgressCard: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
         .neonGlow(color: .green, radius: 15)
+        .smartZoomEffect()
     }
 }
 
@@ -690,6 +735,7 @@ struct PremiumDayPlanMealCard: View {
                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
         )
         .cardPressEffect()
+        .smartZoomEffect()
     }
 }
 
@@ -752,6 +798,7 @@ struct PremiumDaySummaryCard: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
         .gradientBorder(colors: [.green.opacity(0.6), .teal.opacity(0.3)], lineWidth: 1.5)
+        .smartZoomEffect()
     }
 }
 
@@ -821,6 +868,78 @@ struct PremiumEmptyStateCard: View {
             RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
         )
+        .smartZoomEffect()
+    }
+}
+
+// MARK: - Premium Error Card
+struct PremiumErrorCard: View {
+    let message: String
+    var onRetry: (() -> Void)? = nil
+    
+    var body: some View {
+        VStack(spacing: Spacing.large) {
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.red.opacity(0.2), Color.clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 80
+                        )
+                    )
+                    .frame(width: 120, height: 120)
+                
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(.red)
+            }
+            
+            Text("Something Went Wrong")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.white)
+            
+            Text(message)
+                .font(.system(size: 15))
+                .foregroundColor(.white.opacity(0.6))
+                .multilineTextAlignment(.center)
+            
+            if let onRetry = onRetry {
+                Button {
+                    onRetry()
+                    HapticManager.shared.impact(style: .medium)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Try Again")
+                    }
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(
+                        LinearGradient(
+                            colors: [.red.opacity(0.8), .orange.opacity(0.6)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .clipShape(Capsule())
+                    .neonGlow(color: .red, radius: 8)
+                }
+                .cardPressEffect()
+            }
+        }
+        .padding(Spacing.xl)
+        .frame(maxWidth: .infinity)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
+                .stroke(Color.red.opacity(0.3), lineWidth: 1)
+        )
+        .smartZoomEffect()
     }
 }
 

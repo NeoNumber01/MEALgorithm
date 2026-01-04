@@ -151,8 +151,9 @@ struct ShimmerModifier: ViewModifier {
                         .frame(width: 120)
                         .offset(x: phase * geo.size.width * 1.5 - 60)
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
+                    .allowsHitTesting(false)
                 )
-                .mask(content)
                 .onAppear {
                     withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
                         phase = 1

@@ -112,13 +112,17 @@ struct DashboardView: View {
                                 viewModel.viewMode = mode
                             }
                         } label: {
-                            Text(mode == .today ? "📅 Today" : "📊 Stats")
-                                .font(.footnote)
-                                .fontWeight(.medium)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(viewModel.viewMode == mode ? Color.white : Color.clear)
-                                .cornerRadius(8)
+                            HStack(spacing: 4) {
+                                Image(systemName: mode == .today ? "calendar" : "chart.bar.fill")
+                                    .font(.system(size: 12))
+                                Text(mode == .today ? "Today" : "Stats")
+                            }
+                            .font(.footnote)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(viewModel.viewMode == mode ? Color.white : Color.clear)
+                            .cornerRadius(8)
                         }
                         .foregroundColor(viewModel.viewMode == mode ? .black : .white) // Black text on White BG
                         .hapticFeedback(style: .light)
@@ -158,7 +162,7 @@ struct DashboardView: View {
                 HStack(spacing: 12) {
                     MacroCardView(
                         title: "Protein",
-                        icon: "🥩",
+                        systemIcon: "fish.fill",
                         current: viewModel.todayTotals.protein,
                         target: viewModel.targets.protein,
                         unit: "g",
@@ -167,7 +171,7 @@ struct DashboardView: View {
                     
                     MacroCardView(
                         title: "Carbs",
-                        icon: "🍞",
+                        systemIcon: "leaf.fill",
                         current: viewModel.todayTotals.carbs,
                         target: viewModel.targets.carbs,
                         unit: "g",
@@ -176,7 +180,7 @@ struct DashboardView: View {
                     
                     MacroCardView(
                         title: "Fat",
-                        icon: "🧈",
+                        systemIcon: "drop.fill",
                         current: viewModel.todayTotals.fat,
                         target: viewModel.targets.fat,
                         unit: "g",
@@ -224,9 +228,13 @@ struct DashboardView: View {
             if viewModel.isLoading {
                 // Skeleton Mock Items
                 VStack(spacing: 12) {
-                    Text("🍽️ Today's Meals")
-                        .font(.headline)
-                        .skeleton(isLoading: true)
+                    HStack(spacing: 6) {
+                        Image(systemName: "fork.knife")
+                            .font(.system(size: 14))
+                        Text("Today's Meals")
+                    }
+                    .font(.headline)
+                    .skeleton(isLoading: true)
                     
                     ForEach(0..<3) { _ in
                         HStack {
@@ -256,7 +264,7 @@ struct DashboardView: View {
                 .smartZoomEffect()
             } else {
                 EmptyStateView(
-                    icon: "🍽️",
+                    systemIcon: "fork.knife",
                     title: "No meals logged yet",
                     message: "Start tracking your nutrition today!"
                 )
@@ -320,7 +328,7 @@ struct CalorieGaugeView: View {
 // MARK: - Macro Card View
 struct MacroCardView: View {
     let title: String
-    let icon: String
+    let systemIcon: String
     let current: Int
     let target: Int
     let unit: String
@@ -339,8 +347,11 @@ struct MacroCardView: View {
                         .fill(colors.first?.opacity(0.2) ?? .gray)
                         .frame(width: 32, height: 32)
                     
-                    Text(icon)
-                        .font(.system(size: 16))
+                    Image(systemName: systemIcon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
                 }
                 
                 Text(title)
@@ -408,11 +419,12 @@ struct AIFeedbackCard: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 48, height: 48)
+                .frame(width: 48, height: 48)
                 
-                Text("🤖")
-                    .font(.title2)
-            }
+            Image(systemName: "brain.head.profile")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundColor(.white)
+        }
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("AI Coach Insight")
@@ -450,8 +462,12 @@ struct TodayMealsSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("🍽️ Today's Meals")
-                .font(.headline)
+            HStack(spacing: 6) {
+                Image(systemName: "fork.knife")
+                    .font(.system(size: 14))
+                Text("Today's Meals")
+            }
+            .font(.headline)
             
             ForEach(Array(meals.enumerated()), id: \.element.id) { index, meal in
                 Button {
@@ -561,8 +577,12 @@ struct MealDetailSheet: View {
                     // Feedback
                     if let feedback = meal.analysis?.feedback {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("💡 AI Feedback")
-                                .font(.headline)
+                            HStack(spacing: 6) {
+                                Image(systemName: "lightbulb.fill")
+                                    .foregroundColor(.green)
+                                Text("AI Feedback")
+                            }
+                            .font(.headline)
                             Text(feedback)
                                 .foregroundColor(.secondary)
                         }
@@ -626,8 +646,10 @@ extension DashboardView {
         VStack(spacing: 20) {
             // Weekly Summary Card
             VStack(spacing: 16) {
-                HStack {
-                    Text("📊")
+                HStack(spacing: 6) {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(.appPrimary)
                     Text("Weekly Summary")
                         .font(.headline)
                 }
@@ -683,8 +705,13 @@ extension DashboardView {
             
             // Weekly Macros
             VStack(alignment: .leading, spacing: 12) {
-                Text("📈 Weekly Nutrition")
-                    .font(.headline)
+                HStack(spacing: 6) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 14))
+                        .foregroundColor(.green)
+                    Text("Weekly Nutrition")
+                }
+                .font(.headline)
                 
                 HStack(spacing: 12) {
                     MacroSummaryCard(
@@ -710,9 +737,16 @@ extension DashboardView {
             
             // AI Insight Card (matching Web implementation)
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("🤖")
-                        .font(.title2)
+                HStack(spacing: 6) {
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 18))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.appPrimary, .green],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                     Text("AI Insights")
                         .font(.headline)
                     if viewModel.isStatisticsInsightLoading {
@@ -776,8 +810,12 @@ struct WeeklyChartView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("📅 This Week")
-                .font(.headline)
+            HStack(spacing: 6) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 14))
+                Text("This Week")
+            }
+            .font(.headline)
             
             HStack(alignment: .bottom, spacing: 8) {
                 ForEach(data, id: \.date) { item in

@@ -3,16 +3,38 @@ import SwiftUI
 // MARK: - Settings Row (Premium Upgrade)
 /// Reusable row component for settings list items
 struct SettingsRow: View {
-    let icon: String
+    let icon: String?
+    let systemIcon: String?
     let title: String
     var subtitle: String? = nil
     var showChevron: Bool = true
     
+    init(icon: String? = nil, systemIcon: String? = nil, title: String, subtitle: String? = nil, showChevron: Bool = true) {
+        self.icon = icon
+        self.systemIcon = systemIcon
+        self.title = title
+        self.subtitle = subtitle
+        self.showChevron = showChevron
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
-            Text(icon)
-                .font(.title2)
-                .frame(width: 32)
+            if let systemIcon = systemIcon {
+                Image(systemName: systemIcon)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.appPrimary, .appSecondary],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 32)
+            } else if let icon = icon {
+                Text(icon)
+                    .font(.title2)
+                    .frame(width: 32)
+            }
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
