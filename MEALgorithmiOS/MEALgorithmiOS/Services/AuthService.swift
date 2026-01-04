@@ -39,6 +39,25 @@ actor AuthService: AuthServiceProtocol {
         )
     }
     
+    // MARK: - Sign in with OAuth (Google/GitHub)
+    /// Get OAuth sign-in URL for the specified provider
+    /// The URL should be opened in ASWebAuthenticationSession
+    func signInWithOAuth(provider: OAuthProvider) async throws -> URL {
+        // Create the OAuth URL with the app's custom URL scheme for callback
+        let redirectURL = URL(string: "mealgorithm://auth/callback")!
+        
+        let url = try await client.auth.getOAuthSignInURL(
+            provider: provider.supabaseProvider,
+            redirectTo: redirectURL
+        )
+        return url
+    }
+    
+    /// Handle OAuth callback URL and exchange code for session
+    func handleOAuthCallback(url: URL) async throws -> Session {
+        try await client.auth.session(from: url)
+    }
+    
     // MARK: - Sign Out
     /// Sign out the current user
     func signOut() async throws {

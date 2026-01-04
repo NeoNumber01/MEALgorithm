@@ -93,6 +93,9 @@ final class MealLogViewModel: ObservableObject {
                throw AppError.unknown("Repository not configured")
             }
             
+            // 通知其他视图数据已更新
+            NotificationCenter.default.post(name: .mealDidSave, object: nil)
+            
             step = .done
         } catch {
             self.error = AppError.from(error).localizedDescription

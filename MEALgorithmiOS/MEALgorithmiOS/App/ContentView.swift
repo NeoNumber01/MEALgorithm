@@ -70,7 +70,7 @@ struct MainTabView: View {
             Group {
                 switch selectedTab {
                 case .dashboard:
-                    DashboardView()
+                    DashboardView_Modern()
                 case .logMeal:
                     MealLogView()
                 case .recommendations:

@@ -2,11 +2,34 @@ import Foundation
 import Supabase
 import SwiftUI
 
+// MARK: - OAuth Provider
+/// Supported OAuth providers for third-party login
+enum OAuthProvider: String, CaseIterable {
+    case google
+    case github
+    
+    var displayName: String {
+        switch self {
+        case .google: return "Google"
+        case .github: return "GitHub"
+        }
+    }
+    
+    var supabaseProvider: Provider {
+        switch self {
+        case .google: return .google
+        case .github: return .github
+        }
+    }
+}
+
 // MARK: - Auth Service Protocol
 protocol AuthServiceProtocol: Actor {
     func signIn(email: String, password: String) async throws -> Session
     func signUp(email: String, password: String) async throws -> Session
     func signInWithApple(idToken: String, nonce: String) async throws -> Session
+    func signInWithOAuth(provider: OAuthProvider) async throws -> URL
+    func handleOAuthCallback(url: URL) async throws -> Session
     func signOut() async throws
     func getSession() async throws -> Session?
     func isAuthenticated() async -> Bool

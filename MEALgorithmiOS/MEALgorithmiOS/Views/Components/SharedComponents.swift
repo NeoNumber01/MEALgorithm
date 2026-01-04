@@ -20,11 +20,64 @@ struct CustomTabBar: View {
                 }
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 12)
-        .liquidGlass(intensity: .thick, cornerRadius: 30)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 14)
+        .background {
+            ZStack {
+                // Frosted Glass Base
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                
+                // Subtle Tint for Contrast (Apple-like)
+                Rectangle()
+                    .fill(Color.black.opacity(0.2))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 40, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 40, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            .white.opacity(0.5),  // Top rim light
+                            .white.opacity(0.1),  // Side fade
+                            .white.opacity(0.05)  // Bottom shadow
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 0.5
+                )
+        )
+        // Multi-layer shadow for depth
+        .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 10)
+        .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal, 24)
-        .padding(.bottom, 8)
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 0)
+        }
+        .padding(.bottom, safeAreaBottomPadding)
+    }
+    
+    /// 动态计算底部 padding，确保与屏幕边框曲线平行
+    private var safeAreaBottomPadding: CGFloat {
+        // 获取当前窗口的安全区域
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first(where: { $0.isKeyWindow })
+        else {
+            return 8 // 默认值
+        }
+        
+        let bottomSafeArea = window.safeAreaInsets.bottom
+        
+        // 对于有 Home Indicator 的设备（如 iPhone X 及以上），使用较小的额外 padding
+        // 因为 Safe Area 已经提供了足够的间距
+        // 对于有 Home 按钮的设备，使用稍大的 padding 保持美观
+        if bottomSafeArea > 0 {
+            return max(bottomSafeArea - 20, 4) // 有 Home Indicator 的设备
+        } else {
+            return 8 // 有 Home 按钮的设备
+        }
     }
 }
 
@@ -52,11 +105,23 @@ struct TabBarButton: View {
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: [.appPrimary, .appSecondary],
+                                colors: [.appPrimary.opacity(0.2), .appSecondary.opacity(0.2)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
+                        .overlay(
+                            Capsule()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.appPrimary.opacity(0.6), .appSecondary.opacity(0.6)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
+                        .shadow(color: .appPrimary.opacity(0.3), radius: 8, x: 0, y: 0)
                         .matchedGeometryEffect(id: "TAB_INDICATOR", in: namespace)
                 }
             }
@@ -76,6 +141,7 @@ struct LoadingView: View {
                 .tint(.appPrimary)
             
             Text(message)
+                .font(.system(.body, design: .rounded))
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -97,7 +163,7 @@ struct EmptyStateView: View {
                 .font(.system(size: 60))
             
             Text(title)
-                .font(.title2)
+                .font(.system(.title2, design: .rounded))
                 .fontWeight(.bold)
             
             Text(message)
@@ -118,6 +184,7 @@ struct EmptyStateView: View {
                                 endPoint: .trailing
                             )
                         )
+                        .shadow(color: .appPrimary.opacity(0.4), radius: 10, x: 0, y: 5)
                         .clipShape(Capsule())
                 }
             }

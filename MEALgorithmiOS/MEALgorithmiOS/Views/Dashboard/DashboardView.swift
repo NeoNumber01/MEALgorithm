@@ -8,15 +8,23 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background
-                LinearGradient(
-                    colors: [
-                        Color(.systemBackground),
-                        Color.appPrimary.opacity(0.05)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+                // Nebula Background
+                Color.appBackground.ignoresSafeArea()
+                
+                // Ambient Glow
+                GeometryReader { geo in
+                    Circle()
+                        .fill(Color.appPrimary.opacity(0.15))
+                        .frame(width: geo.size.width * 0.8)
+                        .blur(radius: 100)
+                        .offset(x: -geo.size.width * 0.2, y: -100)
+                    
+                    Circle()
+                        .fill(Color.appSecondary.opacity(0.1))
+                        .frame(width: geo.size.width * 0.6)
+                        .blur(radius: 80)
+                        .offset(x: geo.size.width * 0.4, y: geo.size.height * 0.4)
+                }
                 .ignoresSafeArea()
                 
                 ScrollView {
@@ -56,6 +64,9 @@ struct DashboardView: View {
                     viewModel.closeDayDetail()
                 }
             }
+            .sheet(item: $viewModel.selectedMacroItem) { item in
+                MacroDetailSheet(item: item, viewModel: viewModel)
+            }
             .confirmationDialog(
                 "Delete Meal?",
                 isPresented: Binding(
@@ -83,11 +94,12 @@ struct DashboardView: View {
             HStack {
                 VStack(alignment: .leading) {
                     Text(viewModel.viewMode == .today ? "Today's Overview" : "Statistics & History")
-                        .font(.title2)
+                        .font(.system(.title2, design: .rounded))
                         .fontWeight(.bold)
+                        .foregroundColor(.white)
                     
                     Text(Date().formattedDate)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.7))
                 }
                 
                 Spacer()
@@ -105,10 +117,10 @@ struct DashboardView: View {
                                 .fontWeight(.medium)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
-                                .background(viewModel.viewMode == mode ? Color(.systemBackground) : Color.clear)
+                                .background(viewModel.viewMode == mode ? Color.white : Color.clear)
                                 .cornerRadius(8)
                         }
-                        .foregroundColor(viewModel.viewMode == mode ? .primary : .secondary)
+                        .foregroundColor(viewModel.viewMode == mode ? .black : .white) // Black text on White BG
                         .hapticFeedback(style: .light)
                     }
                 }
@@ -123,44 +135,79 @@ struct DashboardView: View {
     // MARK: - Today Content
     private var todayContent: some View {
         VStack(spacing: 20) {
-            // Calorie Gauge
-            CalorieGaugeView(
-                current: viewModel.todayTotals.calories,
-                target: viewModel.targets.calories
-            )
-            .frame(height: 250)
-            .liquidGlass()
+            // Calorie Gauge - Tappable
+            Button {
+                print("📊 Calories gauge tapped")
+                viewModel.selectMacro("calories")
+            } label: {
+                CalorieGaugeView(
+                    current: viewModel.todayTotals.calories,
+                    target: viewModel.targets.calories
+                )
+                .frame(height: 250)
+                .liquidGlass()
+            }
+            .buttonStyle(.plain)
             .hoverEffect()
+            .smartZoomEffect()
             .skeleton(isLoading: viewModel.isLoading)
             
-            // Macro Cards
-            HStack(spacing: 12) {
-                MacroCardView(
-                    title: "Protein",
-                    icon: "🥩",
-                    current: viewModel.todayTotals.protein,
-                    target: viewModel.targets.protein,
-                    unit: "g",
-                    colors: [.proteinColor, .proteinColor.opacity(0.7)]
-                )
+            // Macro Cards - with overlay tappable areas
+            ZStack {
+                // Base layer: Cards with zoom effect
+                HStack(spacing: 12) {
+                    MacroCardView(
+                        title: "Protein",
+                        icon: "🥩",
+                        current: viewModel.todayTotals.protein,
+                        target: viewModel.targets.protein,
+                        unit: "g",
+                        colors: [.proteinStart, .proteinEnd]
+                    )
+                    
+                    MacroCardView(
+                        title: "Carbs",
+                        icon: "🍞",
+                        current: viewModel.todayTotals.carbs,
+                        target: viewModel.targets.carbs,
+                        unit: "g",
+                        colors: [.carbsStart, .carbsEnd]
+                    )
+                    
+                    MacroCardView(
+                        title: "Fat",
+                        icon: "🧈",
+                        current: viewModel.todayTotals.fat,
+                        target: viewModel.targets.fat,
+                        unit: "g",
+                        colors: [.fatStart, .fatEnd]
+                    )
+                }
+                .smartZoomEffect()
                 
-                MacroCardView(
-                    title: "Carbs",
-                    icon: "🍞",
-                    current: viewModel.todayTotals.carbs,
-                    target: viewModel.targets.carbs,
-                    unit: "g",
-                    colors: [.carbsColor, .carbsColor.opacity(0.7)]
-                )
-                
-                MacroCardView(
-                    title: "Fat",
-                    icon: "🧈",
-                    current: viewModel.todayTotals.fat,
-                    target: viewModel.targets.fat,
-                    unit: "g",
-                    colors: [.fatColor, .fatColor.opacity(0.7)]
-                )
+                // Overlay: Invisible tap buttons
+                HStack(spacing: 12) {
+                    Button {
+                        print("📊 Protein card tapped")
+                        viewModel.selectMacro("protein")
+                    } label: {
+                        Color.clear
+                    }
+                    
+                    Button {
+                        print("📊 Carbs card tapped")
+                        viewModel.selectMacro("carbs")
+                    } label: {
+                        Color.clear
+                    }
+                    
+                    Button {
+                        print("📊 Fat card tapped")
+                        viewModel.selectMacro("fat")
+                    } label: {
+                        Color.clear
+                    }
+                }
             }
             .skeleton(isLoading: viewModel.isLoading)
             
@@ -170,6 +217,7 @@ struct DashboardView: View {
                     feedback: viewModel.aiFeedback,
                     isLoading: viewModel.isFeedbackLoading
                 )
+                .smartZoomEffect()
             }
             
             // Today's Meals
@@ -205,13 +253,16 @@ struct DashboardView: View {
                         viewModel.selectedMeal = meal
                     }
                 )
+                .smartZoomEffect()
             } else {
                 EmptyStateView(
                     icon: "🍽️",
                     title: "No meals logged yet",
                     message: "Start tracking your nutrition today!"
                 )
+                .frame(maxWidth: .infinity)
                 .liquidGlass()
+                .smartZoomEffect()
             }
         }
     }
@@ -238,33 +289,31 @@ struct CalorieGaugeView: View {
                 Circle()
                     .trim(from: 0, to: progress)
                     .stroke(
-                        LinearGradient(
-                            colors: [.caloriesColor, .carbsColor],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
+                        LinearGradient.calories,
                         style: StrokeStyle(lineWidth: 20, lineCap: .round)
                     )
                     .rotationEffect(.degrees(-90))
-                    .animation(.easeInOut(duration: 0.5), value: progress)
+                    .shadow(color: .caloriesEnd.opacity(0.5), radius: 15, x: 0, y: 0) // Neon Glow
+                    .animation(.spring(response: 1.5, dampingFraction: 0.8), value: progress)
                 
                 // Center text
                 VStack(spacing: 4) {
                     Text("\(current)")
-                        .font(.system(size: 48, weight: .bold))
-                        .foregroundColor(.primary)
+                        .font(.system(size: 48, weight: .bold, design: .rounded))
+                        .foregroundColor(.white) // Force white
                     
                     Text("of \(target) kcal")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.7)) // Force light
                 }
             }
             .padding(20)
             
             Text("Today's Calories")
                 .font(.headline)
-                .foregroundColor(.secondary)
+                .foregroundColor(.white.opacity(0.7)) // Force light
         }
         .padding()
+        .frame(maxWidth: .infinity) // Ensure full width matching macro cards
     }
 }
 
@@ -283,45 +332,62 @@ struct MacroCardView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(icon)
+                ZStack {
+                    Circle()
+                        .fill(colors.first?.opacity(0.2) ?? .gray)
+                        .frame(width: 32, height: 32)
+                    
+                    Text(icon)
+                        .font(.system(size: 16))
+                }
+                
                 Text(title)
-                    .font(.caption)
-                    .fontWeight(.medium)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
             }
-            .opacity(0.9)
             
-            Text("\(current)\(unit)")
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            Text("of \(target)\(unit)")
-                .font(.caption)
-                .opacity(0.8)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(current)")
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                
+                Text("/ \(target) \(unit)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             
             // Progress bar
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(Color.white.opacity(0.3))
+                        .fill(Color.secondary.opacity(0.1))
                     
                     Capsule()
-                        .fill(Color.white)
+                        .fill(
+                            LinearGradient(
+                                colors: colors,
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                         .frame(width: geo.size.width * progress)
-                        .animation(.easeInOut(duration: 0.5), value: progress)
+                        .shadow(color: colors.last?.opacity(0.5) ?? .clear, radius: 5, x: 0, y: 0)
                 }
             }
             .frame(height: 6)
             
-            Text("\(Int(progress * 100))% complete")
+            Text("\(Int(progress * 100))%")
                 .font(.caption2)
-                .opacity(0.7)
+                .fontWeight(.medium)
+                .foregroundColor(colors.last)
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .foregroundColor(.white)
-        .gradientCard(colors: colors)
+        .liquidGlass() // New Glass Effect
         .hoverEffect()
     }
 }
@@ -452,6 +518,7 @@ struct MealDetailSheet: View {
                         Text(meal.mealType?.icon ?? "🍽️")
                             .font(.system(size: 44))
                     }
+                    .padding(.horizontal) // Added padding
                     
                     // Nutrition Summary
                     if let summary = meal.analysis?.summary {
@@ -461,6 +528,7 @@ struct MealDetailSheet: View {
                             NutritionBadge(value: summary.carbs, label: "Carbs", color: .carbsColor, suffix: "g")
                             NutritionBadge(value: summary.fat, label: "Fat", color: .fatColor, suffix: "g")
                         }
+                        .padding(.horizontal) // Added padding
                     }
                     
                     // Food Items
@@ -487,6 +555,7 @@ struct MealDetailSheet: View {
                                 .cornerRadius(10)
                             }
                         }
+                        .padding(.horizontal) // Added padding
                     }
                     
                     // Feedback
@@ -498,11 +567,14 @@ struct MealDetailSheet: View {
                                 .foregroundColor(.secondary)
                         }
                         .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.green.opacity(0.1))
                         .cornerRadius(12)
+                        .padding(.horizontal) // Match horizontal padding with other elements
                     }
+                 
                 }
-                .padding()
+                .padding(.bottom)
             }
             .navigationTitle("Meal Details")
             .navigationBarTitleDisplayMode(.inline)
@@ -597,6 +669,7 @@ extension DashboardView {
             }
             .padding()
             .liquidGlass()
+            .smartZoomEffect()
             
             // Weekly Chart
             WeeklyChartView(
@@ -606,6 +679,7 @@ extension DashboardView {
                     viewModel.selectDay(date)
                 }
             )
+            .smartZoomEffect()
             
             // Weekly Macros
             VStack(alignment: .leading, spacing: 12) {
@@ -632,6 +706,7 @@ extension DashboardView {
             }
             .padding()
             .liquidGlass()
+            .smartZoomEffect()
             
             // AI Insight Card (matching Web implementation)
             VStack(alignment: .leading, spacing: 12) {
@@ -678,6 +753,7 @@ extension DashboardView {
             }
             .padding()
             .liquidGlass()
+            .smartZoomEffect()
             .task {
                 // Auto-load insight when viewing statistics
                 if viewModel.statisticsInsight.isEmpty {
@@ -887,4 +963,126 @@ extension Date {
 
 #Preview {
     DashboardView()
+}
+
+// MARK: - Macro Detail Sheet
+struct MacroDetailSheet: View {
+    let item: NutritionEducationItem
+    let viewModel: DashboardViewModel
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Chart
+                    NutrientChartView(
+                        data: viewModel.getWeeklyData(for: item.id),
+                        target: getTarget(for: item.id),
+                        color: getColor(for: item.id),
+                        unit: item.id == "calories" ? "kcal" : "g"
+                    )
+                    .frame(height: 200)
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(16)
+                    
+                    // Education Content
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("📖 Knowledge")
+                            .font(.headline)
+                        
+                        Text(item.content)
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .lineSpacing(6)
+                    }
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(16)
+                }
+                .padding()
+            }
+            .navigationTitle(item.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
+    }
+    
+    private func getTarget(for id: String) -> Int {
+        switch id {
+        case "calories": return viewModel.targets.calories
+        case "protein": return viewModel.targets.protein
+        case "carbs": return viewModel.targets.carbs
+        case "fat": return viewModel.targets.fat
+        default: return 0
+        }
+    }
+    
+    private func getColor(for id: String) -> Color {
+        switch id {
+        case "calories": return .caloriesColor
+        case "protein": return .proteinColor
+        case "carbs": return .carbsColor
+        case "fat": return .fatColor
+        default: return .gray
+        }
+    }
+}
+
+// MARK: - Nutrient Chart View
+struct NutrientChartView: View {
+    let data: [(date: Date, value: Int)]
+    let target: Int
+    let color: Color
+    let unit: String
+    
+    private var maxValue: Int {
+        max(data.map { $0.value }.max() ?? 0, target)
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Weekly Trend")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            HStack(alignment: .bottom, spacing: 8) {
+                ForEach(data, id: \.date) { item in
+                    VStack(spacing: 4) {
+                        // Bar
+                        GeometryReader { geo in
+                            VStack {
+                                Spacer()
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(item.value >= target ? Color.green : color)
+                                    .frame(height: maxValue > 0 ? CGFloat(item.value) / CGFloat(maxValue) * geo.size.height : 0)
+                            }
+                        }
+                        .frame(minHeight: 4)
+                        
+                        // Day label
+                        Text(item.date.shortDayName)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            
+            // Target line info
+            HStack {
+                Rectangle()
+                    .fill(Color.green.opacity(0.3))
+                    .frame(width: 20, height: 3)
+                Text("Target: \(target) \(unit)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
 }

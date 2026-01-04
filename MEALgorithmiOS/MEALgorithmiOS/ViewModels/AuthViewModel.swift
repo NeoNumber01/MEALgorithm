@@ -12,6 +12,7 @@ final class AuthViewModel: ObservableObject {
     @Published var isLoading = true
     @Published var error: String?
     @Published var currentUserEmail: String?
+    @Published var oauthURL: URL?  // Triggers ASWebAuthenticationSession for OAuth
     
     // For Sign in with Apple
     var currentNonce: String?
@@ -142,6 +143,57 @@ final class AuthViewModel: ObservableObject {
             }
         }
         
+        isLoading = false
+    }
+    
+    // MARK: - Sign in with OAuth (Google/GitHub)
+    /// Start OAuth sign-in flow with the specified provider
+    func signInWithOAuth(provider: OAuthProvider) async {
+        isLoading = true
+        error = nil
+        
+        do {
+            let url = try await authService.signInWithOAuth(provider: provider)
+            // Store the URL and trigger the web authentication session
+            await MainActor.run {
+                self.oauthURL = url
+            }
+        } catch {
+            self.error = AppError.from(error).localizedDescription
+            isLoading = false
+        }
+    }
+    
+    /// Convenience method for Google sign-in
+    func signInWithGoogle() async {
+        await signInWithOAuth(provider: .google)
+    }
+    
+    /// Convenience method for GitHub sign-in
+    func signInWithGitHub() async {
+        await signInWithOAuth(provider: .github)
+    }
+    
+    /// Handle OAuth callback URL
+    func handleOAuthCallback(url: URL) async {
+        isLoading = true
+        error = nil
+        
+        do {
+            let session = try await authService.handleOAuthCallback(url: url)
+            isAuthenticated = true
+            currentUserEmail = session.user.email
+        } catch {
+            self.error = AppError.from(error).localizedDescription
+        }
+        
+        isLoading = false
+        oauthURL = nil
+    }
+    
+    /// Clear OAuth URL (called when web auth session completes or is cancelled)
+    func clearOAuthURL() {
+        oauthURL = nil
         isLoading = false
     }
     

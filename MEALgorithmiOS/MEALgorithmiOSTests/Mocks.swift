@@ -30,7 +30,10 @@ actor MockGeminiService: GeminiServiceProtocol {
         return insightToReturn
     }
     
+    private(set) var generateRecommendationsCallCount = 0
+
     func generateRecommendations(targetCalories: Int, recentAvgCalories: Int, goal: String?, preferences: [String]?) async throws -> [Recommendation] {
+        generateRecommendationsCallCount += 1
         if let error = errorToThrow { throw error }
         return [
             Recommendation(name: "Mock Meal 1", description: "Desc 1", reason: "Reason 1", nutrition: .zero),
@@ -39,7 +42,10 @@ actor MockGeminiService: GeminiServiceProtocol {
         ]
     }
     
+    private(set) var generateDayPlanCallCount = 0
+    
     func generateDayPlan(targetCalories: Int, consumedCalories: Int, eatenMealTypes: [String], goal: String?, preferences: [String]?) async throws -> (meals: [DayPlanMeal], summary: DayPlanSummary) {
+        generateDayPlanCallCount += 1
         if let error = errorToThrow { throw error }
         return (
             [DayPlanMeal(mealType: "dinner", name: "Mock Dinner", description: "Desc", nutrition: .zero)],
@@ -124,6 +130,17 @@ actor MockAuthService: AuthServiceProtocol {
     }
     
     func signInWithApple(idToken: String, nonce: String) async throws -> Session {
+        if let error = errorToThrow { throw error }
+        guard let session = sessionToReturn else { throw AuthError.sessionNotFound }
+        return session
+    }
+    
+    func signInWithOAuth(provider: OAuthProvider) async throws -> URL {
+        if let error = errorToThrow { throw error }
+        return URL(string: "https://mock.supabase.co/auth/v1/authorize?provider=\(provider.rawValue)")!
+    }
+    
+    func handleOAuthCallback(url: URL) async throws -> Session {
         if let error = errorToThrow { throw error }
         guard let session = sessionToReturn else { throw AuthError.sessionNotFound }
         return session

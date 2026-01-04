@@ -26,17 +26,39 @@ actor GeminiService: GeminiServiceProtocol {
     """
     
     init() {
-        // Load API key from environment or Info.plist
+        // PRIORITY ORDER:
+        // 1. Environment variable (most reliable for debugging)
+        // 2. Info.plist (via xcconfig substitution)
+        
         let apiKey: String
-        if let envKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"] {
+        
+        // Try environment variable first
+        if let envKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"],
+           !envKey.isEmpty,
+           envKey.count > 10 {
             apiKey = envKey
-        } else if let plistKey = Bundle.main.infoDictionary?["GEMINI_API_KEY"] as? String {
+            print("🤖 GeminiService: Using environment variable (len: \(envKey.count))")
+        }
+        // Try Info.plist
+        else if let plistKey = Bundle.main.infoDictionary?["GEMINI_API_KEY"] as? String,
+                !plistKey.hasPrefix("$("),
+                !plistKey.isEmpty,
+                plistKey.count > 10 {
             apiKey = plistKey
-        } else {
-            fatalError("Missing GEMINI_API_KEY in environment or Info.plist")
+            print("🤖 GeminiService: Using Info.plist (len: \(plistKey.count))")
+        }
+        // Debug: show what we got
+        else {
+            let envVal = ProcessInfo.processInfo.environment["GEMINI_API_KEY"] ?? "nil"
+            let plistVal = Bundle.main.infoDictionary?["GEMINI_API_KEY"] as? String ?? "nil"
+            print("❌ GeminiService Debug:")
+            print("   ENV value: '\(envVal)' (len: \(envVal.count))")
+            print("   PLIST value: '\(plistVal)' (len: \(plistVal.count))")
+            fatalError("GEMINI_API_KEY not found. Check Xcode console for debug info.")
         }
         
-        model = GenerativeModel(name: "gemini-2.0-flash", apiKey: apiKey)
+        model = GenerativeModel(name: "gemini-2.5-flash", apiKey: apiKey)
+        print("🤖 GeminiService: Initialized with gemini-2.5-flash")
     }
     
     // MARK: - Analyze Meal
@@ -56,29 +78,32 @@ actor GeminiService: GeminiServiceProtocol {
             parts.append(image)
         }
         
-        // First attempt
-        let response = try await model.generateContent(parts)
-        guard let responseText = response.text else {
-            throw GeminiError.emptyResponse
-        }
-        
-        // Try to parse
+        // No retry logic - strict pass/fail
         do {
-            return try parseAnalysis(from: responseText)
-        } catch {
-            // Retry with error feedback
-            print("First parse failed, retrying...")
-            let retryParts: [any ThrowingPartsRepresentable] = parts + [
-                "\nPrevious Output: \(responseText)",
-                "\nError: The JSON was invalid. Please fix it to match the schema strictly. JSON only."
-            ]
-            
-            let retryResponse = try await model.generateContent(retryParts)
-            guard let retryText = retryResponse.text else {
+            let response = try await model.generateContent(parts)
+            guard let responseText = response.text else {
                 throw GeminiError.emptyResponse
             }
             
-            return try parseAnalysis(from: retryText)
+            // Try to parse
+            do {
+                return try parseAnalysis(from: responseText)
+            } catch {
+                // One-time correction attempt for JSON issues (not a network retry)
+                print("🤖 Gemini: First parse failed, attempting JSON correction...")
+                let correctionParts: [any ThrowingPartsRepresentable] = parts + [
+                    "\nPrevious Output: \(responseText)",
+                    "\nError: The JSON was invalid. Please fix it to match the schema strictly. JSON only."
+                ]
+                
+                let retryResponse = try await model.generateContent(correctionParts)
+                guard let retryText = retryResponse.text else {
+                    throw GeminiError.emptyResponse
+                }
+                return try parseAnalysis(from: retryText)
+            }
+        } catch {
+            throw mapError(error)
         }
     }
     
@@ -110,12 +135,15 @@ actor GeminiService: GeminiServiceProtocol {
         ]
         """
         
-        let response = try await model.generateContent(prompt)
-        guard let responseText = response.text else {
-            throw GeminiError.emptyResponse
+        do {
+            let response = try await model.generateContent(prompt)
+            guard let responseText = response.text else {
+                throw GeminiError.emptyResponse
+            }
+            return try parseRecommendations(from: responseText)
+        } catch {
+            throw mapError(error)
         }
-        
-        return try parseRecommendations(from: responseText)
     }
     
     // MARK: - Generate Day Plan
@@ -159,12 +187,15 @@ actor GeminiService: GeminiServiceProtocol {
         }
         """
         
-        let response = try await model.generateContent(prompt)
-        guard let responseText = response.text else {
-            throw GeminiError.emptyResponse
+        do {
+            let response = try await model.generateContent(prompt)
+            guard let responseText = response.text else {
+                throw GeminiError.emptyResponse
+            }
+            return try parseDayPlan(from: responseText)
+        } catch {
+            throw mapError(error)
         }
-        
-        return try parseDayPlan(from: responseText)
     }
     
     // MARK: - Generate AI Feedback
@@ -200,11 +231,15 @@ actor GeminiService: GeminiServiceProtocol {
         Respond with just the feedback text, no JSON or markdown.
         """
         
-        let response = try await model.generateContent(prompt)
-        if let text = response.text {
-            return cleanFeedbackResponse(text)
+        do {
+            let response = try await model.generateContent(prompt)
+            if let text = response.text {
+                return cleanFeedbackResponse(text)
+            }
+            return "🎯 Keep tracking your meals to get personalized feedback!"
+        } catch {
+            throw mapError(error)
         }
-        return "🎯 Keep tracking your meals to get personalized feedback!"
     }
     
     /// Clean AI response text (matching Web cleanResponse function)
@@ -316,11 +351,51 @@ actor GeminiService: GeminiServiceProtocol {
         Respond with just the feedback text, no JSON or markdown.
         """
         
-        let response = try await model.generateContent(prompt)
-        if let text = response.text {
-            return cleanFeedbackResponse(text)
+        do {
+            let response = try await model.generateContent(prompt)
+            if let text = response.text {
+                return cleanFeedbackResponse(text)
+            }
+            return "📊 Keep logging your meals consistently to get detailed insights about your eating patterns!"
+        } catch {
+            throw mapError(error)
         }
-        return "📊 Keep logging your meals consistently to get detailed insights about your eating patterns!"
+    }
+    
+    // MARK: - Error Handling Helper
+    private func mapError(_ error: Error) -> GeminiError {
+        // If it's already a GeminiError, return it
+        if let geminiError = error as? GeminiError {
+            return geminiError
+        }
+        
+        let nsError = error as NSError
+        let errorString = "\(error)"
+        
+        // 429 / Quota Detection
+        let isRateLimit = nsError.code == 429 ||
+                          nsError.localizedDescription.contains("429") ||
+                          nsError.localizedDescription.contains("Resource exhausted") ||
+                          nsError.localizedDescription.contains("quota") ||
+                          errorString.contains("429") ||
+                          errorString.contains("Resource exhausted")
+        
+        if isRateLimit {
+            // Precise messaging for Quota vs Rate Limit
+            if errorString.contains("PerDay") || errorString.contains("quota exceeded") {
+                return .apiError("⚠️ Daily Limit Reached: You have used your AI usage quota for today. Please wait until tomorrow or upgrade your plan.")
+            } else {
+                return .apiError("⚠️ System Busy: Too many requests at once. Please try again in a few minutes.")
+            }
+        }
+        
+        // Network connectivity
+        if nsError.domain == NSURLErrorDomain {
+            return .apiError("⚠️ Network Error: Please check your internet connection and try again.")
+        }
+        
+        // Other API errors
+        return .apiError("⚠️ AI Service Error: \(nsError.localizedDescription)")
     }
 }
 
@@ -334,11 +409,11 @@ enum GeminiError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noInput:
-            return "Please provide either text or an image"
+            return "Please provide text or an image to analyze."
         case .emptyResponse:
-            return "AI returned an empty response"
+            return "The AI returned an empty response. Please try again."
         case .invalidJSON:
-            return "Failed to parse AI response"
+            return "Failed to process AI response. The data format was incorrect."
         case .apiError(let message):
             return message
         }

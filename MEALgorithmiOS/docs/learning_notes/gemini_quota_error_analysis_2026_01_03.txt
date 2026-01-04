@@ -1,0 +1,43 @@
+# 🐛 Gemini API 429 Error Analysis & Solutions
+Date: 2026-01-03
+
+## 1. Error Description (问题描述)
+The application is receiving `429 Resource Exhausted` errors from the Google Gemini API.
+Logs:
+```
+message: "You exceeded your current quota, please check your plan and billing details...
+Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash"
+```
+
+## 2. Root Cause Analysis (根因分析)
+**Concept**: **Rate Limiting (速率限制)** & **Quota Management (配额管理)**.
+
+*   **Free Tier Limitations**: You are currently using the **Gemini Free Tier**. This tier has strict limits:
+    *   **RPM (Requests Per Minute)**: ~15 RPM (varies by region/model).
+    *   **RPD (Requests Per Day)**: ~1,500 RPD.
+    *   **Concurrency**: 1 request at a time (often).
+*   **The Specific Error**: The logs explicitly state `limit: 20`. This suggests you hit a burst limit (e.g., 20 requests in a short window) or a daily limit for the specific model `gemini-2.5-flash`.
+*   **Why now?**: As you test the app, you might be sending multiple requests in quick succession (e.g., analysis + recommendations + stats), triggering the rate limiter.
+
+## 3. Solutions (解决方案)
+
+### Solution A: Professional Upgrade (Recommended for Production)
+**Billing Account (Pay-as-you-go)**
+*   **Action**: Link a billing account in Google Cloud Console.
+*   **Benefit**: Raises limits significantly (e.g., to 360 RPM).
+*   **Cost**: Very low for development/testing usage (cents per thousands of requests).
+
+### Solution B: Optimization & Caching (Architectural Fix)
+**Reduce API Calls**
+*   Currently, the app might be fetching new data every time a view appears.
+*   **Fix**: Implement `CacheManager` to store results for 24 hours. Only call API if cache is expired.
+*   **Status**: We have verified `RecommendationsViewModel` caching, but need to ensure `GeminiService` itself doesn't retry aggressively on 429 if the quota is truly done.
+
+### Solution C: Robust Error Handling (User Experience Fix)
+**Graceful Degradation**
+*   Instead of crashing or showing a raw error, show: "AI Daily Limit Reached. Please try again tomorrow."
+*   **Fix**: Update `GeminiService` to return a user-friendly error state that the View recognizes and renders as a specific UI (e.g., a "Sleeping Robot" icon).
+
+## 4. Next Steps for You (接下来的行动)
+1.  **Check Quota**: Go to [Google AI Studio](https://aistudio.google.com/) -> Settings -> Plan.
+2.  **Review Code**: We will implement Solution B (Caching) and C (Better UI) to handle this gracefully in the app.

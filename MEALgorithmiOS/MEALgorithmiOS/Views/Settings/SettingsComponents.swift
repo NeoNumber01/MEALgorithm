@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Settings Row
+// MARK: - Settings Row (Premium Upgrade)
 /// Reusable row component for settings list items
 struct SettingsRow: View {
     let icon: String
@@ -16,12 +16,12 @@ struct SettingsRow: View {
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .foregroundColor(.primary)
+                    .foregroundColor(.white)
                 
                 if let subtitle = subtitle {
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.5))
                         .lineLimit(1)
                 }
             }
@@ -32,7 +32,7 @@ struct SettingsRow: View {
     }
 }
 
-// MARK: - Profile Header Row
+// MARK: - Profile Header Row (Premium Upgrade)
 /// User avatar and email display for settings
 struct ProfileHeaderRow: View {
     let email: String?
@@ -40,31 +40,33 @@ struct ProfileHeaderRow: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            // Avatar
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [.appPrimary.opacity(0.6), .appSecondary.opacity(0.4)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            // Avatar with Glow
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.appPrimary.opacity(0.7), .appSecondary.opacity(0.5)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-                .frame(width: 60, height: 60)
-                .overlay(
-                    Text(avatarInitial)
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                )
+                    .frame(width: 64, height: 64)
+                    .neonGlow(color: .appPrimary, radius: 12)
+                
+                Text(avatarInitial)
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+            }
             
             // Info
             VStack(alignment: .leading, spacing: 4) {
                 Text("My Profile")
-                    .font(.headline)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.white)
                 
                 Text(email ?? "Not signed in")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.6))
             }
             
             Spacer()
@@ -93,22 +95,25 @@ struct MacroTargetRow: View {
             Circle()
                 .fill(color)
                 .frame(width: 12, height: 12)
+                .shadow(color: color.opacity(0.5), radius: 4)
             
             Text(title)
+                .foregroundColor(.white)
             
             Spacer()
             
             if disabled {
                 Text("\(value) \(unit)")
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.5))
             } else {
                 TextField("", value: $value, format: .number)
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
+                    .foregroundColor(.white)
                 
                 Text(unit)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.5))
             }
         }
         .opacity(disabled ? 0.6 : 1)
@@ -116,15 +121,27 @@ struct MacroTargetRow: View {
 }
 
 #Preview("Settings Row") {
-    List {
-        SettingsRow(icon: "📏", title: "Physical Stats", subtitle: "Height: 175cm, Weight: 70kg")
-        SettingsRow(icon: "🎯", title: "Goals & Targets")
-        SettingsRow(icon: "🔔", title: "Notifications")
+    ZStack {
+        Color.appBackground.ignoresSafeArea()
+        
+        List {
+            SettingsRow(icon: "📏", title: "Physical Stats", subtitle: "Height: 175cm, Weight: 70kg")
+            SettingsRow(icon: "🎯", title: "Goals & Targets")
+            SettingsRow(icon: "🔔", title: "Notifications")
+        }
+        .scrollContentBackground(.hidden)
+        .listStyle(.insetGrouped)
     }
 }
 
 #Preview("Profile Header") {
-    List {
-        ProfileHeaderRow(email: "user@example.com")
+    ZStack {
+        Color.appBackground.ignoresSafeArea()
+        
+        List {
+            ProfileHeaderRow(email: "user@example.com")
+                .listRowBackground(Color.white.opacity(0.05))
+        }
+        .scrollContentBackground(.hidden)
     }
 }

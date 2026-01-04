@@ -32,19 +32,37 @@ struct LiquidGlassModifier: ViewModifier {
     }
     
     func body(content: Content) -> some View {
-        // Using ultraThinMaterial for glassmorphism effect
-        // Note: iOS 26 will have native .glassEffect() when available
         content
             .background(.ultraThinMaterial)
             .background(
-                Color.white.opacity(intensity.opacity)
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(intensity == .thin ? 0.05 : 0.1),
+                        Color.white.opacity(0.02)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
             )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                .white.opacity(0.4),
+                                .white.opacity(0.1),
+                                .clear,
+                                .white.opacity(0.05),
+                                .white.opacity(0.2)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
             )
-            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+            .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 10)
     }
 }
 

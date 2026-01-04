@@ -18,9 +18,12 @@ final class RecommendationsViewModelTests: XCTestCase {
             profileService: mockProfileService,
             mealService: mockMealService
         )
+        // Clear cache to ensure clean state for each test
+        viewModel.resetCache()
     }
     
     override func tearDown() {
+        viewModel.resetCache() // Clean up after tests too
         viewModel = nil
         mockGeminiService = nil
         mockProfileService = nil
@@ -66,6 +69,34 @@ final class RecommendationsViewModelTests: XCTestCase {
         XCTAssertNotNil(viewModel.error)
         XCTAssertEqual(viewModel.error, "Failed to load recommendations")
         XCTAssertTrue(viewModel.recommendations.isEmpty)
+        XCTAssertTrue(viewModel.recommendations.isEmpty)
+    }
+    
+    func testLoadNextMeal_Caching_AvoidsDuplicateCalls() async {
+        // Given
+        await mockProfileService.setProfile(Profile(id: UUID(), calorieTarget: 2000))
+        
+        // When - First Load
+        await viewModel.loadNextMeal(forceRefresh: false)
+        let initialCallCount = await mockGeminiService.generateRecommendationsCallCount
+        
+        // Then
+        XCTAssertEqual(initialCallCount, 1, "Should call service on first load")
+        XCTAssertFalse(viewModel.isLoadingNextMeal)
+        
+        // When - Second Load (should use cache)
+        await viewModel.loadNextMeal(forceRefresh: false)
+        let secondCallCount = await mockGeminiService.generateRecommendationsCallCount
+        
+        // Then
+        XCTAssertEqual(secondCallCount, 1, "Should NOT call service again when cached")
+        
+        // When - Force Refresh
+        await viewModel.loadNextMeal(forceRefresh: true)
+        let finalCallCount = await mockGeminiService.generateRecommendationsCallCount
+        
+        // Then
+        XCTAssertEqual(finalCallCount, 2, "Should call service again on force refresh")
     }
     
     // MARK: - Day Plan Loading Tests
@@ -96,6 +127,33 @@ final class RecommendationsViewModelTests: XCTestCase {
         XCTAssertNotNil(viewModel.error)
         XCTAssertEqual(viewModel.error, "Failed to load day plan")
         XCTAssertTrue(viewModel.dayPlan.isEmpty)
+    }
+    
+    func testLoadDayPlan_Caching_AvoidsDuplicateCalls() async {
+        // Given
+        await mockProfileService.setProfile(Profile(id: UUID(), calorieTarget: 2000))
+        
+        // When - First Load
+        await viewModel.loadDayPlan(forceRefresh: false)
+        let initialCallCount = await mockGeminiService.generateDayPlanCallCount
+        
+        // Then
+        XCTAssertEqual(initialCallCount, 1, "Should call service on first load")
+        XCTAssertFalse(viewModel.isLoadingDayPlan)
+        
+        // When - Second Load (should use cache)
+        await viewModel.loadDayPlan(forceRefresh: false)
+        let secondCallCount = await mockGeminiService.generateDayPlanCallCount
+        
+        // Then
+        XCTAssertEqual(secondCallCount, 1, "Should NOT call service again when cached")
+        
+        // When - Force Refresh
+        await viewModel.loadDayPlan(forceRefresh: true)
+        let finalCallCount = await mockGeminiService.generateDayPlanCallCount
+        
+        // Then
+        XCTAssertEqual(finalCallCount, 2, "Should call service again on force refresh")
     }
     
     // MARK: - Logic Verification Tests

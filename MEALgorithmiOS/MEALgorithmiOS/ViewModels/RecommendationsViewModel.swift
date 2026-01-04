@@ -59,6 +59,17 @@ final class RecommendationsViewModel: ObservableObject {
             nextMealLoaded = false
         }
         
+        // Check persistent cache
+        if !forceRefresh {
+            if let cached: CachedRecommendations = loadFromCache(key: cacheKeyNextMeal) {
+                print("DEBUG: Using cached recommendations")
+                self.recommendations = cached.recommendations
+                self.recommendationContext = cached.context
+                self.nextMealLoaded = true
+                return
+            }
+        }
+        
         isLoadingNextMeal = true
         error = nil
         
@@ -108,6 +119,10 @@ final class RecommendationsViewModel: ObservableObject {
             )
             
             nextMealLoaded = true
+            
+            // Save to cache
+            saveToCache(CachedRecommendations(recommendations: recommendations, context: recommendationContext), key: cacheKeyNextMeal)
+            
         } catch {
             self.error = "Failed to load recommendations"
         }
@@ -119,6 +134,18 @@ final class RecommendationsViewModel: ObservableObject {
     func loadDayPlan(forceRefresh: Bool = false) async {
         if forceRefresh {
             dayPlanLoaded = false
+        }
+        
+        // Check persistent cache
+        if !forceRefresh {
+            if let cached: CachedDayPlan = loadFromCache(key: cacheKeyDayPlan) {
+                print("DEBUG: Using cached day plan")
+                self.dayPlan = cached.plan
+                self.daySummary = cached.summary
+                self.dayContext = cached.context
+                self.dayPlanLoaded = true
+                return
+            }
         }
         
         isLoadingDayPlan = true
@@ -180,6 +207,10 @@ final class RecommendationsViewModel: ObservableObject {
             dayPlan = result.meals
             daySummary = result.summary
             dayPlanLoaded = true
+            
+            // Save to cache
+            saveToCache(CachedDayPlan(plan: dayPlan, summary: daySummary, context: dayContext), key: cacheKeyDayPlan)
+            
         } catch {
             self.error = "Failed to load day plan"
         }
@@ -200,6 +231,50 @@ final class RecommendationsViewModel: ObservableObject {
     func resetCache() {
         nextMealLoaded = false
         dayPlanLoaded = false
+        userDefaults.removeObject(forKey: cacheKeyNextMeal)
+        userDefaults.removeObject(forKey: cacheKeyDayPlan)
+    }
+    
+    // MARK: - Caching
+    private let userDefaults = UserDefaults.standard
+    private let cacheKeyNextMeal = "meal_recommendations_cache_v1"
+    private let cacheKeyDayPlan = "day_plan_cache_v1"
+    private let cacheValidityDuration: TimeInterval = 4 * 3600 // 4 hours
+
+    struct CachedData<T: Codable>: Codable {
+        let items: T
+        let timestamp: Date
+        let context: String? // Optional scope/context hash
+    }
+    
+    struct CachedDayPlan: Codable {
+        let plan: [DayPlanMeal]
+        let summary: DayPlanSummary?
+        let context: DayPlanContext?
+    }
+    
+    struct CachedRecommendations: Codable {
+        let recommendations: [Recommendation]
+        let context: RecommendationContext?
+    }
+
+    private func saveToCache<T: Codable>(_ data: T, key: String) {
+        let cached = CachedData(items: data, timestamp: Date(), context: nil)
+        if let encoded = try? JSONEncoder().encode(cached) {
+            userDefaults.set(encoded, forKey: key)
+        }
+    }
+
+    private func loadFromCache<T: Codable>(key: String) -> T? {
+        guard let data = userDefaults.data(forKey: key),
+              let decoded = try? JSONDecoder().decode(CachedData<T>.self, from: data) else {
+            return nil
+        }
+        
+        if Date().timeIntervalSince(decoded.timestamp) < cacheValidityDuration {
+            return decoded.items
+        }
+        return nil
     }
     
     // MARK: - Helper: Extract Frequent Ingredients

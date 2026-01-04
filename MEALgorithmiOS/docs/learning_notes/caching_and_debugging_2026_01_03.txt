@@ -1,0 +1,82 @@
+# 学习笔记：缓存机制实现与调试复盘 (Caching & Debugging)
+
+## 1. 编译错误分析 (Compilation Errors)
+
+### 问题描述
+在构建项目时，我们遇到了 `Exit code: 65` 和 `expected expression` 错误。这类错误通常比较模糊，难以直接定位。
+
+### 原因 (Root Cause)
+经过仔细检查 `test_output.txt` 日志，我们发现 `LoginView.swift` 和 `SettingsView.swift` 中存在多余的闭合符号（`}` 或 `)`）。
+例如在 `LoginView.swift` 中：
+```swift
+                )
+                ) // 多余的括号
+                .ignoresSafeArea()
+```
+这通常是因为代码合并 (Merge) 或复制粘贴时未注意层级导致的。
+
+### 解决方案
+- **查看编译器日志**：不要只看简单的错误提示，要深入日志查找具体的行号。
+- **匹配括号**：在 Xcode 中，双击一个括号可以高亮其配对的括号，帮助快速发现不匹配的情况。
+
+## 2. 缓存机制实现 (Caching Implementation)
+
+为了减少对 Google Gemini API 的重复调用，我们实现了一个双层缓存策略：
+
+### 内存缓存 (In-Memory Caching)
+- 使用 `nextMealLoaded` 和 `dayPlanLoaded` 标记。
+- 在应用运行期间，只要不强制刷新，就不会重复请求。
+
+### 持久化缓存 (Persistent Caching)
+- 使用 `UserDefaults` 存储序列化的 JSON 数据。
+- **数据结构**：`CachedData<T>` 包含数据本身、时间戳 (`timestamp`) 和上下文 (`context`)。
+- **过期策略**：设置了 4 小时 (`4 * 3600`) 的有效期。如果缓存过期，会自动失效。
+
+### 关键代码
+```swift
+struct CachedData<T: Codable>: Codable {
+    let items: T
+    let timestamp: Date
+    let context: String?
+}
+```
+
+## 3. 单元测试与共享状态 (Unit Tests & Shared State)
+
+### 测试失败原因
+在运行 `testLoadNextMeal_Caching_AvoidsDuplicateCalls` 时，测试失败了。
+原因是 **共享状态 (Shared State)**。
+`UserDefaults.standard` 是全局单例，它是持久化的。前一个测试 (`testLoadNextMeal_Success`) 执行后，可能已经在 `UserDefaults` 中留下了缓存数据。
+当缓存测试开始时，它意外地读取到了上一个测试留下的缓存，导致行为不符合预期（本该调用 API 1 次，结果调用了 0 次，直接读取了缓存）。
+
+### 解决方案
+在测试的 `setUp()` 方法中调用 `resetCache()`，确保每个测试都在一个干净的环境中开始。
+```swift
+    override func setUp() async throws {
+        // ... 初始化 ...
+        viewModel.resetCache() // 清除脏数据
+    }
+```
+**教训**：在编写涉及持久化（Core Data, UserDefaults, 文件系统）的单元测试时，务必在 `setUp` 或 `tearDown` 中清理环境。
+
+## 4. 视图间通信 (Inter-View Communication)
+
+### 问题
+用户在 "Settings" 页面修改了个人资料（如目标卡路里），但 "Recommendations" 页面因为缓存原因，仍然显示旧的推荐。
+
+### 解决方案
+我们使用了 `NotificationCenter` 进行解耦通信。
+1. **发布通知**：在 `SettingsViewModel` 保存成功后，发送 `.profileDidUpdate` 通知。
+2. **监听通知**：在 `RecommendationsView` 中监听该通知，收到后自动调用 `resetCache()` 并重新加载数据。
+
+```swift
+// SettingsViewModel.swift
+NotificationCenter.default.post(name: .profileDidUpdate, object: nil)
+
+// RecommendationsView.swift
+.onReceive(NotificationCenter.default.publisher(for: .profileDidUpdate)) { _ in
+    viewModel.resetCache()
+    // Reload...
+}
+```
+这种模式非常适合两个没有直接父子关系的 ViewModel 之间进行简单的事件同步。

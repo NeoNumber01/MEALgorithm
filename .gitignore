@@ -71,3 +71,6 @@ MEALgorithmiOS_backup/
 # Learning documentation (per user requirement)
 docs/learning_notes/
 
+
+# Block shared schemes with secrets
+*.xcscheme

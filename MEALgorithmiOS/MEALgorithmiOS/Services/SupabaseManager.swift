@@ -40,9 +40,34 @@ final class SupabaseManager {
         
         print("📦 SupabaseManager: Connecting to \(url.host ?? "unknown")")
         
+        // Create custom URLSession configuration to help with iOS Simulator network issues
+        // Cloudflare (used by Supabase) enables HTTP/3 by default, which can cause
+        // "network connection was lost" errors (-1005) on iOS Simulator
+        let urlSessionConfiguration = URLSessionConfiguration.default
+        
+        // Stability settings to help with QUIC/HTTP3 issues
+        urlSessionConfiguration.multipathServiceType = .none
+        urlSessionConfiguration.timeoutIntervalForRequest = 30
+        urlSessionConfiguration.timeoutIntervalForResource = 60
+        urlSessionConfiguration.waitsForConnectivity = true
+        
+        // These settings help ensure connection attempts proceed
+        urlSessionConfiguration.allowsConstrainedNetworkAccess = true
+        urlSessionConfiguration.allowsExpensiveNetworkAccess = true
+        
+        // Note: If you encounter "network connection was lost" errors on Simulator:
+        // 1. Reset the iOS Simulator: Device > Erase All Content and Settings
+        // 2. Or test on a real device instead
+        print("📦 SupabaseManager: Custom URLSession configured")
+        
         client = SupabaseClient(
             supabaseURL: url,
-            supabaseKey: supabaseKey
+            supabaseKey: supabaseKey,
+            options: SupabaseClientOptions(
+                global: SupabaseClientOptions.GlobalOptions(
+                    session: URLSession(configuration: urlSessionConfiguration)
+                )
+            )
         )
     }
 }

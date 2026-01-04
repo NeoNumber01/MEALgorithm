@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - About Settings View
+// MARK: - About Settings View (Premium Upgrade)
 /// Sub-page for app information, support, and legal links
 struct AboutSettingsView: View {
     @Environment(\.openURL) private var openURL
@@ -9,103 +9,160 @@ struct AboutSettingsView: View {
     private let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     
     var body: some View {
-        Form {
-            // App Info Section
-            Section {
-                HStack {
-                    // App Icon
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                colors: [.appPrimary, .appSecondary],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 60, height: 60)
-                        .overlay(
+        ZStack {
+            // Nebula Background
+            nebulaBackground
+            
+            Form {
+                // App Info Section
+                Section {
+                    HStack {
+                        // App Icon
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.appPrimary, .appSecondary],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 64, height: 64)
+                                .neonGlow(color: .appPrimary, radius: 12)
+                            
                             Text("🍽️")
-                                .font(.largeTitle)
-                        )
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("MEALgorithm")
-                            .font(.headline)
-                        Text("Version \(appVersion) (\(buildNumber))")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                                .font(.system(size: 32))
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("MEALgorithm")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
+                            Text("Version \(appVersion) (\(buildNumber))")
+                                .font(.system(size: 14))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                        .padding(.leading, 8)
+                        
+                        Spacer()
                     }
-                    .padding(.leading, 8)
-                    
-                    Spacer()
+                    .padding(.vertical, 8)
                 }
-                .padding(.vertical, 8)
-            }
-            
-            // Support Section
-            Section("Support") {
-                Button {
-                    // TODO: Open help center
-                } label: {
-                    SettingsRow(icon: "❓", title: "Help & FAQ")
-                }
-                .foregroundColor(.primary)
+                .listRowBackground(Color.white.opacity(0.05))
                 
-                Button {
-                    if let url = URL(string: "mailto:support@mealgorithm.app") {
-                        openURL(url)
+                // Support Section
+                Section {
+                    Button {
+                        // TODO: Open help center
+                        HapticManager.shared.impact(style: .light)
+                    } label: {
+                        SettingsRow(icon: "❓", title: "Help & FAQ")
                     }
-                } label: {
-                    SettingsRow(icon: "📧", title: "Contact Support")
-                }
-                .foregroundColor(.primary)
-                
-                Button {
-                    requestAppStoreReview()
-                } label: {
-                    SettingsRow(icon: "⭐", title: "Rate the App")
-                }
-                .foregroundColor(.primary)
-            }
-            
-            // Legal Section
-            Section("Legal") {
-                Button {
-                    if let url = URL(string: "https://mealgorithm.app/privacy") {
-                        openURL(url)
-                    }
-                } label: {
-                    SettingsRow(icon: "🔒", title: "Privacy Policy")
-                }
-                .foregroundColor(.primary)
-                
-                Button {
-                    if let url = URL(string: "https://mealgorithm.app/terms") {
-                        openURL(url)
-                    }
-                } label: {
-                    SettingsRow(icon: "📋", title: "Terms of Service")
-                }
-                .foregroundColor(.primary)
-            }
-            
-            // Credits Section
-            Section {
-                VStack(spacing: 8) {
-                    Text("Made with ❤️ for healthier eating")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
                     
-                    Text("© 2026 MEALgorithm")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    Button {
+                        if let url = URL(string: "mailto:support@mealgorithm.app") {
+                            openURL(url)
+                        }
+                        HapticManager.shared.impact(style: .light)
+                    } label: {
+                        SettingsRow(icon: "📧", title: "Contact Support")
+                    }
+                    
+                    Button {
+                        requestAppStoreReview()
+                        HapticManager.shared.notification(type: .success)
+                    } label: {
+                        SettingsRow(icon: "⭐", title: "Rate the App")
+                    }
+                } header: {
+                    Text("Support")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.6))
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .listRowBackground(Color.white.opacity(0.05))
+                
+                // Legal Section
+                Section {
+                    Button {
+                        if let url = URL(string: "https://mealgorithm.app/privacy") {
+                            openURL(url)
+                        }
+                        HapticManager.shared.impact(style: .light)
+                    } label: {
+                        SettingsRow(icon: "🔒", title: "Privacy Policy")
+                    }
+                    
+                    Button {
+                        if let url = URL(string: "https://mealgorithm.app/terms") {
+                            openURL(url)
+                        }
+                        HapticManager.shared.impact(style: .light)
+                    } label: {
+                        SettingsRow(icon: "📋", title: "Terms of Service")
+                    }
+                } header: {
+                    Text("Legal")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                .listRowBackground(Color.white.opacity(0.05))
+                
+                // Credits Section
+                Section {
+                    VStack(spacing: 8) {
+                        Text("Made with ❤️ for healthier eating")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.6))
+                        
+                        Text("© 2026 MEALgorithm")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .listRowBackground(Color.white.opacity(0.05))
             }
+            .scrollContentBackground(.hidden)
         }
         .navigationTitle("About")
         .navigationBarTitleDisplayMode(.inline)
+    }
+    
+    // MARK: - Nebula Background
+    private var nebulaBackground: some View {
+        ZStack {
+            Color.appBackground.ignoresSafeArea()
+            
+            GeometryReader { geo in
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.appPrimary.opacity(0.25), Color.clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: geo.size.width * 0.5
+                        )
+                    )
+                    .frame(width: geo.size.width * 0.8)
+                    .blur(radius: 60)
+                    .offset(x: -geo.size.width * 0.2, y: -100)
+                
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.appSecondary.opacity(0.2), Color.clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: geo.size.width * 0.4
+                        )
+                    )
+                    .frame(width: geo.size.width * 0.6)
+                    .blur(radius: 50)
+                    .offset(x: geo.size.width * 0.5, y: geo.size.height * 0.4)
+            }
+            .ignoresSafeArea()
+        }
     }
     
     private func requestAppStoreReview() {

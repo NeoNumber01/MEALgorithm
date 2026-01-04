@@ -10,6 +10,21 @@
 	<key>GEMINI_API_KEY</key>
 	<string>$(GEMINI_API_KEY)</string>
 	
+	<!-- URL Scheme for OAuth callbacks -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>OAuth Callback</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>mealgorithm</string>
+			</array>
+		</dict>
+	</array>
+	
 	<!-- Camera & Photo Library Permissions -->
 	<key>NSCameraUsageDescription</key>
 	<string>我们需要访问相机来拍摄你的餐食照片进行 AI 分析</string>

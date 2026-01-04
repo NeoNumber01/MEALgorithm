@@ -24,7 +24,14 @@ struct MEALgorithmApp: App {
             ContentView()
                 .environmentObject(authViewModel)
                 .environmentObject(networkMonitor)
+                .preferredColorScheme(.dark) // Force Nebula Theme (Dark Mode)
                 .modelContainer(container)
+                .onOpenURL { url in
+                    // Handle OAuth callback URL
+                    Task {
+                        await authViewModel.handleOAuthCallback(url: url)
+                    }
+                }
         }
     }
 }
