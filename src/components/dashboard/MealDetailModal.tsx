@@ -29,13 +29,27 @@ interface Meal {
     analysis: MealAnalysis
 }
 
+type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+
 interface MealDetailModalProps {
     meal: Meal
     onClose: () => void
+    onMealTypeChange?: (mealId: string, newType: MealType) => Promise<void>
+    onDelete?: (mealId: string) => Promise<void>
 }
 
-export default function MealDetailModal({ meal, onClose }: MealDetailModalProps) {
+const MEAL_TYPE_OPTIONS: { value: MealType; label: string; emoji: string }[] = [
+    { value: 'breakfast', label: 'Breakfast', emoji: '🌅' },
+    { value: 'lunch', label: 'Lunch', emoji: '☀️' },
+    { value: 'dinner', label: 'Dinner', emoji: '🌙' },
+    { value: 'snack', label: 'Snack', emoji: '🍿' },
+]
+
+export default function MealDetailModal({ meal, onClose, onMealTypeChange, onDelete }: MealDetailModalProps) {
     const [isVisible, setIsVisible] = useState(false)
+    const [isEditingType, setIsEditingType] = useState(false)
+    const [currentMealType, setCurrentMealType] = useState<string>(meal.mealType || 'meal')
+    const [isUpdating, setIsUpdating] = useState(false)
 
     useEffect(() => {
         setIsVisible(true)
@@ -46,9 +60,56 @@ export default function MealDetailModal({ meal, onClose }: MealDetailModalProps)
         }
     }, [])
 
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+    // Sync current type with prop changes
+    useEffect(() => {
+        setCurrentMealType(meal.mealType || 'meal')
+    }, [meal.mealType])
+
     const handleClose = () => {
         setIsVisible(false)
         setTimeout(onClose, 300) // Wait for animation
+    }
+
+    const handleMealTypeSelect = async (newType: MealType) => {
+        if (!onMealTypeChange || newType === currentMealType) {
+            setIsEditingType(false)
+            return
+        }
+
+        setIsUpdating(true)
+        try {
+            await onMealTypeChange(meal.id, newType)
+            setCurrentMealType(newType)
+        } catch (error) {
+            console.error('Failed to update meal type:', error)
+        } finally {
+            setIsUpdating(false)
+            setIsEditingType(false)
+        }
+    }
+
+    const getMealTypeEmoji = (type: string) => {
+        const option = MEAL_TYPE_OPTIONS.find(o => o.value === type)
+        return option?.emoji || '🍽️'
+    }
+
+    const handleDeleteClick = () => {
+        setShowDeleteConfirm(true)
+    }
+
+    const handleConfirmDelete = async () => {
+        if (!onDelete) return
+        setIsUpdating(true)
+        try {
+            await onDelete(meal.id)
+            handleClose()
+        } catch (error) {
+            console.error('Failed to delete meal:', error)
+            setIsUpdating(false)
+            setShowDeleteConfirm(false)
+        }
     }
 
     if (!meal) return null
@@ -56,9 +117,40 @@ export default function MealDetailModal({ meal, onClose }: MealDetailModalProps)
     return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300 ${isVisible ? 'bg-black/60 backdrop-blur-sm opacity-100' : 'bg-black/0 backdrop-blur-none opacity-0 pointer-events-none'}`} onClick={handleClose}>
             <div
-                className={`w-full max-w-lg bg-white/80 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/40 overflow-hidden transform transition-all duration-300 ${isVisible ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'}`}
+                className={`relative w-full max-w-lg bg-white/80 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/40 overflow-hidden transform transition-all duration-300 ${isVisible ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'}`}
                 onClick={(e) => e.stopPropagation()}
             >
+                {/* Delete Confirmation Overlay */}
+                {showDeleteConfirm && (
+                    <div className="absolute inset-0 z-50 bg-white/40 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
+                        <div className="bg-white/90 shadow-2xl rounded-3xl p-6 w-full max-w-sm border border-white/60 text-center transform transition-all scale-100">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <span className="text-3xl">🗑️</span>
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Meal?</h3>
+                            <p className="text-gray-500 mb-6 text-sm leading-relaxed">
+                                Are you sure you want to delete this meal? This action cannot be undone.
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowDeleteConfirm(false)}
+                                    className="flex-1 py-3 px-4 rounded-xl font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                                    disabled={isUpdating}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleConfirmDelete}
+                                    className="flex-1 py-3 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 shadow-lg shadow-red-500/30 transition-all active:scale-95"
+                                    disabled={isUpdating}
+                                >
+                                    {isUpdating ? 'Deleting...' : 'Delete'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Header Image or Gradient */}
                 <div className="h-32 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 relative">
                     {meal.imagePath && (
@@ -76,7 +168,41 @@ export default function MealDetailModal({ meal, onClose }: MealDetailModalProps)
                         ✕
                     </button>
                     <div className="absolute bottom-4 left-6 text-white">
-                        <p className="text-sm font-medium opacity-90 uppercase tracking-widest mb-1">{meal.mealType || 'Meal'}</p>
+                        {/* Meal Type Editor */}
+                        {isEditingType ? (
+                            <div className="flex items-center gap-2 mb-1">
+                                {MEAL_TYPE_OPTIONS.map((option) => (
+                                    <button
+                                        key={option.value}
+                                        onClick={() => handleMealTypeSelect(option.value)}
+                                        disabled={isUpdating}
+                                        className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${currentMealType === option.value
+                                            ? 'bg-white text-gray-900'
+                                            : 'bg-white/20 hover:bg-white/30'
+                                            } ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        {option.emoji} {option.label}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={() => setIsEditingType(false)}
+                                    className="ml-2 text-white/70 hover:text-white text-sm"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => onMealTypeChange && setIsEditingType(true)}
+                                className={`text-sm font-medium opacity-90 uppercase tracking-widest mb-1 flex items-center gap-2 ${onMealTypeChange ? 'hover:bg-white/20 px-2 py-1 -ml-2 rounded-lg cursor-pointer transition-colors' : ''
+                                    }`}
+                                disabled={!onMealTypeChange}
+                            >
+                                <span>{getMealTypeEmoji(currentMealType)}</span>
+                                <span>{currentMealType || 'Meal'}</span>
+                                {onMealTypeChange && <span className="text-xs opacity-70">✏️</span>}
+                            </button>
+                        )}
                         <h2 className="text-3xl font-bold text-shadow-sm">Meal Details</h2>
                         <p className="text-sm opacity-80">
                             {new Date(meal.createdAt).toLocaleString()}
@@ -143,10 +269,19 @@ export default function MealDetailModal({ meal, onClose }: MealDetailModalProps)
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-4 border-t border-gray-100 bg-white/50 flex justify-end">
+                <div className="p-4 border-t border-gray-100 bg-white/50 flex justify-between items-center">
+                    {onDelete && (
+                        <button
+                            onClick={handleDeleteClick}
+                            disabled={isUpdating}
+                            className="px-4 py-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl font-medium transition-colors flex items-center gap-2"
+                        >
+                            🗑️ Delete Meal
+                        </button>
+                    )}
                     <button
                         onClick={handleClose}
-                        className="px-6 py-2 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5 transform"
+                        className="px-6 py-2 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5 transform ml-auto"
                     >
                         Close
                     </button>

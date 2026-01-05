@@ -84,6 +84,7 @@ Deno.serve(async (req: Request) => {
             model: "gemini-2.0-flash",
             generationConfig: {
                 responseMimeType: "application/json",
+                maxOutputTokens: 2048, // Ensure enough tokens for complete response
             },
         })
 

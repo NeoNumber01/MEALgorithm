@@ -102,49 +102,56 @@ export async function getRecommendations(forceRefresh = false): Promise<Recommen
         .eq('id', user.id)
         .single()
 
-    // Check if we should use cache
-    if (!forceRefresh && profile?.cached_next_meal && profile?.next_meal_updated_at) {
+    // When forceRefresh is true, skip cache entirely and regenerate
+    if (forceRefresh) {
+        console.log('Recommendations: Force refresh requested, skipping cache...')
+    } else if (profile?.cached_next_meal && profile?.next_meal_updated_at) {
         const cached = profile.cached_next_meal as RecommendationResult
-        const cacheTime = new Date(profile.next_meal_updated_at).getTime()
-        const lastMealTime = profile.last_meal_at ? new Date(profile.last_meal_at).getTime() : 0
-        const profileUpdatedTime = profile.profile_updated_at ? new Date(profile.profile_updated_at).getTime() : 0
 
-        // Check if the cached targets match current profile targets
-        // This prevents unnecessary regeneration when profile is saved with same values
-        const cachedTargetCalories = cached.context?.targetCalories
-        const currentTargetCalories = profile.calorie_target || 2000
-        const targetsMatch = cachedTargetCalories === currentTargetCalories
+        // Validate cache structure - must have recommendations array
+        if (!cached.recommendations || !Array.isArray(cached.recommendations) || cached.recommendations.length === 0) {
+            console.log('Recommendations: Cache invalid - missing or empty recommendations array, regenerating...')
+        } else {
+            const cacheTime = new Date(profile.next_meal_updated_at).getTime()
+            const lastMealTime = profile.last_meal_at ? new Date(profile.last_meal_at).getTime() : 0
+            const profileUpdatedTime = profile.profile_updated_at ? new Date(profile.profile_updated_at).getTime() : 0
 
-        // Check if the cached goal matches current profile goal
-        const cachedGoal = cached.context?.goal
-        const currentGoal = profile.goal_description || 'General health'
-        const goalsMatch = cachedGoal === currentGoal
+            // Check if the cached targets match current profile targets
+            const cachedTargetCalories = cached.context?.targetCalories
+            const currentTargetCalories = profile.calorie_target || 2000
+            const targetsMatch = cachedTargetCalories === currentTargetCalories
 
-        // Use cache if:
-        // 1. Cache is newer than last meal, AND
-        // 2. Cache is newer than profile update (preferences change), AND
-        // 3. Target values haven't actually changed, AND
-        // 4. Goal description hasn't changed
-        if (cacheTime > lastMealTime && cacheTime > profileUpdatedTime && targetsMatch && goalsMatch) {
-            console.log('Recommendations: Using cached data (no changes detected)')
-            return cached
+            // Check if the cached goal matches current profile goal
+            const cachedGoal = cached.context?.goal
+            const currentGoal = profile.goal_description || 'General health'
+            const goalsMatch = cachedGoal === currentGoal
+
+            // Use cache if all conditions are met
+            if (cacheTime > lastMealTime && cacheTime > profileUpdatedTime && targetsMatch && goalsMatch) {
+                console.log('Recommendations: Using cached data (no changes detected)')
+                return cached
+            }
+            console.log('Recommendations: Cache invalid, regenerating...', { targetsMatch, goalsMatch, cacheTime, lastMealTime, profileUpdatedTime })
         }
-        console.log('Recommendations: Cache invalid, regenerating...', { targetsMatch, goalsMatch, cacheTime, lastMealTime, profileUpdatedTime })
     }
 
     // Generate new recommendations
-    const result = await generateNewRecommendations(user.id, profile)
-
-    // Cache the result
-    if (!('error' in result)) {
-        await supabase
-            .from('profiles')
-            .update({
-                cached_next_meal: result,
-                next_meal_updated_at: new Date().toISOString(),
-            })
-            .eq('id', user.id)
+    let result: RecommendationResult
+    try {
+        result = await generateNewRecommendations(user.id, profile)
+    } catch (e) {
+        console.error('Recommendations: Generation failed:', e)
+        return { error: 'Failed to generate recommendations. Please try again.' }
     }
+
+    // Cache the result (only on success)
+    await supabase
+        .from('profiles')
+        .update({
+            cached_next_meal: result,
+            next_meal_updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id)
 
     return result
 }
@@ -258,6 +265,7 @@ Provide exactly 3 recommendations in this JSON format:
         }
 
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        console.log('Recommendations: Calling Edge Function...')
         const response = await fetch(`${supabaseUrl}/functions/v1/ai-generate`, {
             method: 'POST',
             headers: {
@@ -268,11 +276,35 @@ Provide exactly 3 recommendations in this JSON format:
         })
 
         if (!response.ok) {
+            const errorText = await response.text()
+            console.error('Recommendations: Edge Function error:', response.status, errorText)
             throw new Error(`Edge Function error: ${response.status}`)
         }
 
         const result = await response.json()
-        const parsed = result.data
+        console.log('Recommendations: Edge Function response type:', typeof result.data)
+
+        // Parse the data - it might be a string that needs JSON.parse
+        let parsed
+        if (typeof result.data === 'string') {
+            try {
+                parsed = JSON.parse(result.data)
+                console.log('Recommendations: Parsed string data successfully')
+            } catch (parseError) {
+                console.error('Recommendations: Failed to parse JSON string:', parseError)
+                throw new Error('Failed to parse AI response')
+            }
+        } else {
+            parsed = result.data || result
+        }
+
+        console.log('Recommendations: Parsed data has', parsed?.recommendations?.length, 'recommendations')
+
+        // Validate the parsed data
+        if (!parsed || !Array.isArray(parsed.recommendations) || parsed.recommendations.length === 0) {
+            console.error('Recommendations: Invalid response structure:', parsed)
+            throw new Error('Invalid response from AI')
+        }
 
         return {
             recommendations: parsed.recommendations,
@@ -283,34 +315,9 @@ Provide exactly 3 recommendations in this JSON format:
             }
         }
     } catch (e) {
-        console.error('Recommendations error:', e)
-        return {
-            recommendations: [
-                {
-                    name: 'Grilled Chicken Salad',
-                    description: 'Fresh greens with grilled chicken breast and light vinaigrette.',
-                    reason: 'High protein, low calorie option perfect for staying on track.',
-                    nutrition: { calories: 350, protein: 35, carbs: 15, fat: 12 }
-                },
-                {
-                    name: 'Salmon with Vegetables',
-                    description: 'Baked salmon fillet with steamed broccoli and quinoa.',
-                    reason: 'Rich in omega-3s and complete protein.',
-                    nutrition: { calories: 450, protein: 40, carbs: 25, fat: 18 }
-                },
-                {
-                    name: 'Greek Yogurt Bowl',
-                    description: 'Greek yogurt with berries, honey, and granola.',
-                    reason: 'Great for a light snack with protein and probiotics.',
-                    nutrition: { calories: 280, protein: 18, carbs: 35, fat: 8 }
-                }
-            ],
-            context: {
-                targetCalories: 2000,
-                recentAvgCalories: avgCalories,
-                goal: 'General health',
-            }
-        }
+        console.error('Recommendations: AI generation error:', e)
+        // Re-throw the error so the caller can handle it properly
+        throw e
     }
 }
 
@@ -328,42 +335,51 @@ export async function getDayPlan(forceRefresh = false): Promise<DayPlanResult | 
         .eq('id', user.id)
         .single()
 
-    // Check if we should use cache
-    if (!forceRefresh && profile?.cached_day_plan && profile?.day_plan_updated_at) {
+    // When forceRefresh is true, skip cache entirely and regenerate
+    if (forceRefresh) {
+        console.log('Day Plan: Force refresh requested, skipping cache...')
+    } else if (profile?.cached_day_plan && profile?.day_plan_updated_at) {
         const cached = profile.cached_day_plan as DayPlanResult
-        const cacheTime = new Date(profile.day_plan_updated_at).getTime()
-        const lastMealTime = profile.last_meal_at ? new Date(profile.last_meal_at).getTime() : 0
-        const profileUpdatedTime = profile.profile_updated_at ? new Date(profile.profile_updated_at).getTime() : 0
 
-        // Check if the cached targets match current profile targets
-        const cachedTargetCalories = cached.context?.targetCalories
-        const currentTargetCalories = profile.calorie_target || 2000
-        const targetsMatch = cachedTargetCalories === currentTargetCalories
+        // Validate cache structure - must have dayPlan array and context
+        if (!cached.dayPlan || !Array.isArray(cached.dayPlan) || !cached.context) {
+            console.log('Day Plan: Cache invalid - missing dayPlan array or context, regenerating...')
+        } else {
+            const cacheTime = new Date(profile.day_plan_updated_at).getTime()
+            const lastMealTime = profile.last_meal_at ? new Date(profile.last_meal_at).getTime() : 0
+            const profileUpdatedTime = profile.profile_updated_at ? new Date(profile.profile_updated_at).getTime() : 0
 
-        // Use cache if:
-        // 1. Cache is newer than last meal, AND
-        // 2. Cache is newer than profile update (preferences/goal change), AND
-        // 3. Target values haven't actually changed
-        if (cacheTime > lastMealTime && cacheTime > profileUpdatedTime && targetsMatch) {
-            console.log('Day Plan: Using cached data (no changes detected)')
-            return cached
+            // Check if the cached targets match current profile targets
+            const cachedTargetCalories = cached.context?.targetCalories
+            const currentTargetCalories = profile.calorie_target || 2000
+            const targetsMatch = cachedTargetCalories === currentTargetCalories
+
+            // Use cache if all conditions are met
+            if (cacheTime > lastMealTime && cacheTime > profileUpdatedTime && targetsMatch) {
+                console.log('Day Plan: Using cached data (no changes detected)')
+                return cached
+            }
+            console.log('Day Plan: Cache invalid, regenerating...', { targetsMatch, cacheTime, lastMealTime, profileUpdatedTime })
         }
-        console.log('Day Plan: Cache invalid, regenerating...', { targetsMatch, cacheTime, lastMealTime, profileUpdatedTime })
     }
 
     // Generate new day plan
-    const result = await generateNewDayPlan(user.id, profile)
-
-    // Cache the result
-    if (!('error' in result)) {
-        await supabase
-            .from('profiles')
-            .update({
-                cached_day_plan: result,
-                day_plan_updated_at: new Date().toISOString(),
-            })
-            .eq('id', user.id)
+    let result: DayPlanResult
+    try {
+        result = await generateNewDayPlan(user.id, profile)
+    } catch (e) {
+        console.error('Day Plan: Generation failed:', e)
+        return { error: 'Failed to generate day plan. Please try again.' }
     }
+
+    // Cache the result (only on success)
+    await supabase
+        .from('profiles')
+        .update({
+            cached_day_plan: result,
+            day_plan_updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id)
 
     return result
 }
@@ -489,11 +505,33 @@ Respond in this exact JSON format:
         }
 
         const result = await response.json()
-        const parsed = result.data
+        console.log('Day Plan: Edge Function response type:', typeof result.data)
+
+        // Parse the data - it might be a string that needs JSON.parse
+        let parsed
+        if (typeof result.data === 'string') {
+            try {
+                parsed = JSON.parse(result.data)
+                console.log('Day Plan: Parsed string data successfully')
+            } catch (parseError) {
+                console.error('Day Plan: Failed to parse JSON string:', parseError)
+                throw new Error('Failed to parse AI response')
+            }
+        } else {
+            parsed = result.data || result
+        }
+
+        console.log('Day Plan: Parsed data has', parsed?.dayPlan?.length, 'meals')
+
+        // Validate the parsed data - dayPlan can be empty if all meals are eaten
+        if (!parsed || !Array.isArray(parsed.dayPlan)) {
+            console.error('Day Plan: Invalid response structure:', parsed)
+            throw new Error('Invalid response from AI')
+        }
 
         return {
             dayPlan: parsed.dayPlan,
-            summary: parsed.summary,
+            summary: parsed.summary || { totalPlannedCalories: 0, advice: 'Enjoy your day!' },
             context: {
                 targetCalories,
                 consumedCalories,
@@ -503,32 +541,8 @@ Respond in this exact JSON format:
             }
         }
     } catch (e) {
-        console.error('Day plan error:', e)
-        return {
-            dayPlan: remainingMealTypes.map(mealType => ({
-                mealType,
-                name: mealType === 'breakfast' ? 'Oatmeal with Fruits' :
-                    mealType === 'lunch' ? 'Grilled Chicken Salad' :
-                        mealType === 'dinner' ? 'Salmon with Vegetables' : 'Greek Yogurt',
-                description: 'A balanced and nutritious option.',
-                nutrition: {
-                    calories: Math.round(remainingCalories / Math.max(1, remainingMealTypes.length)),
-                    protein: 25,
-                    carbs: 30,
-                    fat: 10
-                }
-            })),
-            summary: {
-                totalPlannedCalories: remainingCalories,
-                advice: 'Stay hydrated and maintain balanced portions throughout the day.'
-            },
-            context: {
-                targetCalories,
-                consumedCalories,
-                remainingCalories,
-                eatenMealTypes,
-                remainingMealTypes,
-            }
-        }
+        console.error('Day Plan: AI generation error:', e)
+        // Re-throw the error so the caller can handle it properly
+        throw e
     }
 }

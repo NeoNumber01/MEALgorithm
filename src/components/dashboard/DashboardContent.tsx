@@ -1,17 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getDailyStats, getWeeklyStats, getUserProfile } from '@/lib/dashboard/actions'
-import { generateGoalFeedback } from '@/lib/dashboard/ai-feedback'
-import { updateCachedFeedback } from '@/lib/profile/actions'
+import { getDailyStats, getUserProfile } from '@/lib/dashboard/actions'
 import { getNutritionalTargets } from '@/lib/nutrition/calculator'
-import { deleteMeal } from '@/lib/meals/actions'
+import { deleteMeal, updateMealType } from '@/lib/meals/actions'
 import CalorieGauge from './CalorieGauge'
+import AICoachCard from './AICoachCard'
 import Link from 'next/link'
 import MealDetailModal from './MealDetailModal'
 import StatisticsView from './StatisticsView'
 import ConfirmModal from '@/components/ui/ConfirmModal'
-import { notifyDataUpdated, getLastDataUpdateTime, getLastGoalUpdateTime, generateDataHash, shouldRegenerateAIFeedback, CACHE_KEYS } from '@/lib/cache-utils'
+import { notifyDataUpdated, getLastDataUpdateTime, invalidateAIFeedbackCache, CACHE_KEYS } from '@/lib/cache-utils'
 
 type ViewMode = 'today' | 'week'
 
@@ -30,7 +29,6 @@ export default function DashboardContent() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         meals: any[]
     } | null>(null)
-    const [feedback, setFeedback] = useState<string>('')
     const [targets, setTargets] = useState<NutritionTargets>({
         calories: 2000,
         protein: 150,
@@ -41,7 +39,9 @@ export default function DashboardContent() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedMeal, setSelectedMeal] = useState<any>(null)
     const [mealToDelete, setMealToDelete] = useState<string | null>(null)
-    const [feedbackLoading, setFeedbackLoading] = useState(false)
+    const [editingMealId, setEditingMealId] = useState<string | null>(null)
+    const [goalDescription, setGoalDescription] = useState<string | undefined>()
+
     const [lastUpdateTimestamp, setLastUpdateTimestamp] = useState<number>(() => {
         if (typeof window !== 'undefined') return getLastDataUpdateTime()
         return Date.now()
@@ -64,7 +64,6 @@ export default function DashboardContent() {
             cachedTime = parseInt(localStorage.getItem(CACHE_KEYS.DASHBOARD_TIMESTAMP) || '0')
             const cachedToday = localStorage.getItem(CACHE_KEYS.DASHBOARD_TODAY)
             const cachedTargets = localStorage.getItem(CACHE_KEYS.DASHBOARD_TARGETS)
-            const cachedFeedback = localStorage.getItem(CACHE_KEYS.DASHBOARD_FEEDBACK)
 
             if (cachedToday) {
                 const parsedToday = JSON.parse(cachedToday)
@@ -74,7 +73,6 @@ export default function DashboardContent() {
                 if (cachedDate === today && cachedTime > lastDbUpdate) {
                     setTodayData(parsedToday)
                     if (cachedTargets) setTargets(JSON.parse(cachedTargets))
-                    if (cachedFeedback) setFeedback(cachedFeedback)
                     setLoading(false)
                     // Background refresh if cache is old (> 1 hour) but valid
                     if (Date.now() - cachedTime < 3600000) return
@@ -84,7 +82,6 @@ export default function DashboardContent() {
             console.error('Cache read error', e)
         }
 
-        const timezoneOffset = new Date().getTimezoneOffset()
         const now = new Date()
 
         const startOfDay = new Date(now)
@@ -93,12 +90,8 @@ export default function DashboardContent() {
         const endOfDay = new Date(now)
         endOfDay.setHours(23, 59, 59, 999)
 
-        const startOfWeek = new Date(startOfDay)
-        startOfWeek.setDate(startOfWeek.getDate() - 6)
-
-        const [dailyResult, weeklyResult, profileResult] = await Promise.all([
+        const [dailyResult, profileResult] = await Promise.all([
             getDailyStats(startOfDay.toISOString(), endOfDay.toISOString()),
-            getWeeklyStats(startOfWeek.toISOString(), endOfDay.toISOString(), timezoneOffset),
             getUserProfile(),
         ])
 
@@ -132,47 +125,11 @@ export default function DashboardContent() {
         if (!('error' in profileResult) && profileResult.profile) {
             calculatedTargets = getNutritionalTargets(profileResult.profile)
             setTargets(calculatedTargets)
+            setGoalDescription(profileResult.profile.goal_description || undefined)
             localStorage.setItem(CACHE_KEYS.DASHBOARD_TARGETS, JSON.stringify(calculatedTargets))
         }
 
-        // Smart AI feedback generation - only call AI when data actually changed
-        if (!('error' in dailyResult) && !('error' in weeklyResult)) {
-            // Create hash of current data used for feedback
-            const feedbackDataHash = generateDataHash({
-                todayCalories: dailyResult.totals.calories,
-                weeklyAvgCalories: weeklyResult.averages.calories,
-                targetCalories: calculatedTargets.calories,
-                goalDescription: profileResult.profile?.goal_description,
-            })
-            
-            // Get cached hash and feedback
-            const cachedHash = localStorage.getItem(CACHE_KEYS.DASHBOARD_FEEDBACK_HASH)
-            const cachedFeedback = localStorage.getItem(CACHE_KEYS.DASHBOARD_FEEDBACK)
-            const lastFeedbackTime = parseInt(localStorage.getItem(CACHE_KEYS.DASHBOARD_TIMESTAMP) || '0')
-            
-            // Check if we need to regenerate AI feedback
-            if (shouldRegenerateAIFeedback(feedbackDataHash, cachedHash, lastFeedbackTime)) {
-                console.log('AI Feedback: Data changed, regenerating...', { cachedHash, feedbackDataHash })
-                setFeedbackLoading(true)
-                const feedbackResult = await generateGoalFeedback({
-                    todayCalories: dailyResult.totals.calories,
-                    weeklyAvgCalories: weeklyResult.averages.calories,
-                    targetCalories: calculatedTargets.calories,
-                    goalDescription: profileResult.profile?.goal_description,
-                })
-                setFeedback(feedbackResult.feedback)
-                setFeedbackLoading(false)
 
-                // Cache the new feedback and hash
-                await updateCachedFeedback(feedbackResult.feedback)
-                localStorage.setItem(CACHE_KEYS.DASHBOARD_FEEDBACK, feedbackResult.feedback)
-                localStorage.setItem(CACHE_KEYS.DASHBOARD_FEEDBACK_HASH, feedbackDataHash)
-            } else if (cachedFeedback) {
-                // Use cached feedback - no AI call needed
-                console.log('AI Feedback: Using cached feedback (no data change)')
-                setFeedback(cachedFeedback)
-            }
-        }
 
         setLoading(false)
     }
@@ -217,6 +174,34 @@ export default function DashboardContent() {
         setMealToDelete(null)
     }
 
+    const handleMealTypeChange = async (mealId: string, newType: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
+        const result = await updateMealType(mealId, newType)
+
+        if (result?.success) {
+            notifyDataUpdated()
+            // Update local state immediately
+            if (todayData) {
+                const updatedMeals = todayData.meals.map(meal =>
+                    meal.id === mealId ? { ...meal, mealType: newType } : meal
+                )
+                setTodayData({ ...todayData, meals: updatedMeals })
+
+                // Update cache
+                localStorage.setItem(CACHE_KEYS.DASHBOARD_TODAY, JSON.stringify({
+                    date: new Date().toLocaleDateString('en-CA'),
+                    totals: todayData.totals,
+                    meals: updatedMeals,
+                }))
+            }
+            // Update selectedMeal if it's the one being edited
+            if (selectedMeal?.id === mealId) {
+                setSelectedMeal({ ...selectedMeal, mealType: newType })
+            }
+            setLastUpdateTimestamp(Date.now())
+        }
+        setEditingMealId(null)
+    }
+
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
@@ -247,8 +232,10 @@ export default function DashboardContent() {
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => {
-                            localStorage.removeItem('dashboard_today_data')
-                            localStorage.removeItem('dashboard_timestamp')
+                            // Clear all dashboard and AI feedback caches to force fresh data
+                            localStorage.removeItem(CACHE_KEYS.DASHBOARD_TODAY)
+                            localStorage.removeItem(CACHE_KEYS.DASHBOARD_TIMESTAMP)
+                            invalidateAIFeedbackCache()
                             loadData()
                         }}
                         className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
@@ -373,28 +360,24 @@ export default function DashboardContent() {
                         </div>
                     </div>
 
-                    {/* AI Feedback */}
-                    {(feedback || feedbackLoading) && (
-                        <div className="relative overflow-hidden bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-lg">
-                            <div className="absolute -right-4 -bottom-4 text-8xl opacity-10">🤖</div>
-                            <div className="relative flex gap-4">
-                                <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl flex items-center justify-center text-2xl shadow-lg">
-                                    🤖
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="font-bold text-emerald-800 mb-1">AI Coach Insight</h3>
-                                    {feedbackLoading ? (
-                                        <div className="flex items-center gap-2 text-emerald-600">
-                                            <div className="w-4 h-4 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" />
-                                            <span className="animate-pulse">Analyzing your progress...</span>
-                                        </div>
-                                    ) : (
-                                        <p className="text-emerald-700 leading-relaxed">{feedback}</p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    {/* AI Coach */}
+                    <AICoachCard
+                        context="today"
+                        todayData={{
+                            calories: todayData?.totals?.calories || 0,
+                            protein: todayData?.totals?.protein || 0,
+                            carbs: todayData?.totals?.carbs || 0,
+                            fat: todayData?.totals?.fat || 0,
+                            mealCount: todayData?.meals?.length || 0,
+                            mealTypes: todayData?.meals?.map(m => m.mealType || 'lunch') || [],
+                            targetProtein: targets.protein,
+                            targetCarbs: targets.carbs,
+                            targetFat: targets.fat,
+                        }}
+                        targetCalories={targets.calories}
+                        goalDescription={goalDescription}
+                    />
+
                 </>
             )}
 
@@ -403,6 +386,7 @@ export default function DashboardContent() {
                 <StatisticsView
                     targetCalories={targets.calories}
                     lastUpdateTimestamp={lastUpdateTimestamp}
+                    onDataUpdate={loadData}
                 />
             )}
 
@@ -416,7 +400,7 @@ export default function DashboardContent() {
                         </Link>
                     </div>
                     <div className="space-y-3">
-                        {todayData.meals.map((meal, index) => (
+                        {todayData.meals.map((meal) => (
                             <div
                                 key={meal.id}
                                 onClick={() => setSelectedMeal(meal)}
@@ -424,15 +408,46 @@ export default function DashboardContent() {
                             >
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center text-lg">
-                                        {meal.mealType === 'breakfast' ? '🌅' : 
-                                         meal.mealType === 'lunch' ? '☀️' : 
-                                         meal.mealType === 'dinner' ? '🌙' : 
-                                         meal.mealType === 'snack' ? '🍿' : '🍽️'}
+                                        {meal.mealType === 'breakfast' ? '🌅' :
+                                            meal.mealType === 'lunch' ? '☀️' :
+                                                meal.mealType === 'dinner' ? '🌙' :
+                                                    meal.mealType === 'snack' ? '🍿' : '🍽️'}
                                     </div>
                                     <div>
-                                        <span className="capitalize font-semibold text-gray-900">
-                                            {meal.mealType || 'Meal'}
-                                        </span>
+                                        {editingMealId === meal.id ? (
+                                            <select
+                                                value={meal.mealType || 'lunch'}
+                                                onChange={(e) => {
+                                                    e.stopPropagation()
+                                                    handleMealTypeChange(meal.id, e.target.value as 'breakfast' | 'lunch' | 'dinner' | 'snack')
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                onBlur={() => setEditingMealId(null)}
+                                                autoFocus
+                                                className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-semibold text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            >
+                                                <option value="breakfast">🌅 Breakfast</option>
+                                                <option value="lunch">☀️ Lunch</option>
+                                                <option value="dinner">🌙 Dinner</option>
+                                                <option value="snack">🍿 Snack</option>
+                                            </select>
+                                        ) : (
+                                            <div className="flex items-center gap-1">
+                                                <span className="capitalize font-semibold text-gray-900">
+                                                    {meal.mealType || 'Meal'}
+                                                </span>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        setEditingMealId(meal.id)
+                                                    }}
+                                                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-purple-600 transition-all p-1"
+                                                    title="Edit meal type"
+                                                >
+                                                    ✏️
+                                                </button>
+                                            </div>
+                                        )}
                                         <div className="text-gray-400 text-xs">
                                             {new Date(meal.createdAt).toLocaleTimeString('en-US', {
                                                 hour: '2-digit',
@@ -486,6 +501,7 @@ export default function DashboardContent() {
                 <MealDetailModal
                     meal={selectedMeal}
                     onClose={() => setSelectedMeal(null)}
+                    onMealTypeChange={handleMealTypeChange}
                 />
             )}
 

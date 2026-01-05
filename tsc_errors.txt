@@ -1,0 +1,26 @@
+﻿src/components/recommendations/RecommendationsContent.tsx(134,51): error TS2322: Type '{ onClose: () => void; }' is not assignable to type 'IntrinsicAttributes & { onUpdate?: (() => void) | undefined; }'.
+  Property 'onClose' does not exist on type 'IntrinsicAttributes & { onUpdate?: (() => void) | undefined; }'.
+supabase/functions/ai-generate/index.ts(4,36): error TS2307: Cannot find module 'npm:@google/generative-ai@0.21.0' or its corresponding type declarations.
+supabase/functions/ai-generate/index.ts(5,30): error TS2307: Cannot find module 'npm:@supabase/supabase-js@2' or its corresponding type declarations.
+supabase/functions/ai-generate/index.ts(6,41): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+supabase/functions/ai-generate/index.ts(13,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate/index.ts(37,29): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate/index.ts(38,33): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate/index.ts(52,24): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate/index.ts(111,53): error TS18046: 'error' is of type 'unknown'.
+supabase/functions/analyze-meal/index.ts(4,36): error TS2307: Cannot find module 'npm:@google/generative-ai@0.21.0' or its corresponding type declarations.
+supabase/functions/analyze-meal/index.ts(5,30): error TS2307: Cannot find module 'npm:@supabase/supabase-js@2' or its corresponding type declarations.
+supabase/functions/analyze-meal/index.ts(6,41): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+supabase/functions/analyze-meal/index.ts(32,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/analyze-meal/index.ts(56,29): error TS2304: Cannot find name 'Deno'.
+supabase/functions/analyze-meal/index.ts(57,33): error TS2304: Cannot find name 'Deno'.
+supabase/functions/analyze-meal/index.ts(71,24): error TS2304: Cannot find name 'Deno'.
+supabase/functions/analyze-meal/index.ts(159,53): error TS18046: 'error' is of type 'unknown'.
+supabase/functions/generate-suggestions/index.ts(4,36): error TS2307: Cannot find module 'npm:@google/generative-ai@0.21.0' or its corresponding type declarations.
+supabase/functions/generate-suggestions/index.ts(5,30): error TS2307: Cannot find module 'npm:@supabase/supabase-js@2' or its corresponding type declarations.
+supabase/functions/generate-suggestions/index.ts(6,41): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+supabase/functions/generate-suggestions/index.ts(172,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/generate-suggestions/index.ts(196,29): error TS2304: Cannot find name 'Deno'.
+supabase/functions/generate-suggestions/index.ts(197,33): error TS2304: Cannot find name 'Deno'.
+supabase/functions/generate-suggestions/index.ts(211,24): error TS2304: Cannot find name 'Deno'.
+supabase/functions/generate-suggestions/index.ts(328,53): error TS18046: 'error' is of type 'unknown'.

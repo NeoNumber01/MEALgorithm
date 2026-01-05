@@ -19,21 +19,62 @@ export default function MealLogForm() {
     const [error, setError] = useState<string | null>(null)
     const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('lunch')
 
+    // Food detection states
+    const [isCheckingFood, setIsCheckingFood] = useState(false)
+    const [isFoodValid, setIsFoodValid] = useState(false)
+    const [detectedFoodClass, setDetectedFoodClass] = useState<string | null>(null)
+
     // Date/Time state (defaults to now)
     const now = new Date()
     const [date, setDate] = useState(now.toLocaleDateString('en-CA')) // YYYY-MM-DD local
     const [time, setTime] = useState(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`)
 
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
-        if (file) {
-            setImageFile(file)
-            const reader = new FileReader()
-            reader.onloadend = () => {
-                setImagePreview(reader.result as string)
+        if (!file) return
+
+        setImageFile(file)
+        setError(null)
+        setIsFoodValid(false)
+        setDetectedFoodClass(null)
+        setIsCheckingFood(true)
+
+        const reader = new FileReader()
+        reader.onloadend = async () => {
+            const dataUrl = reader.result as string
+            setImagePreview(dataUrl)
+
+            // Immediately check if image contains food
+            try {
+                const base64Data = dataUrl.split(',')[1]
+
+                const response = await fetch('/api/classify-food', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64Data, threshold: 0.15 }),
+                })
+
+                const result = await response.json()
+
+                if (result.isFood || result.failOpen) {
+                    setIsFoodValid(true)
+                    setDetectedFoodClass(result.detectedClass || null)
+                    if (result.detectedClass) {
+                        console.log(`[MealLogForm] Detected food: ${result.detectedClass}`)
+                    }
+                } else {
+                    setIsFoodValid(false)
+                    setError('This image does not appear to contain food. Please upload a photo of your meal.')
+                }
+            } catch (err) {
+                // Fail-open: allow if detection fails
+                console.warn('[MealLogForm] Food detection error:', err)
+                setIsFoodValid(true)
+            } finally {
+                setIsCheckingFood(false)
             }
-            reader.readAsDataURL(file)
         }
+        reader.readAsDataURL(file)
     }
 
     const handleSetToNow = () => {
@@ -46,6 +87,7 @@ export default function MealLogForm() {
         setError(null)
         setStep('preview')
 
+        // Food detection already done on image upload - just proceed with analysis
         const formData = new FormData()
         if (inputMode === 'text') {
             formData.append('text', textInput)
@@ -135,7 +177,14 @@ export default function MealLogForm() {
                 <div className="space-y-6">
                     <div className="flex gap-4 mb-6">
                         <button
-                            onClick={() => setInputMode('text')}
+                            onClick={() => {
+                                if (inputMode !== 'text') {
+                                    setInputMode('text')
+                                    // Clear previous analysis when switching modes
+                                    setAnalysis(null)
+                                    setError(null)
+                                }
+                            }}
                             className={`flex-1 py-3 rounded-lg font-medium transition ${inputMode === 'text'
                                 ? 'bg-blue-600 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -144,7 +193,14 @@ export default function MealLogForm() {
                             📝 Text
                         </button>
                         <button
-                            onClick={() => setInputMode('image')}
+                            onClick={() => {
+                                if (inputMode !== 'image') {
+                                    setInputMode('image')
+                                    // Clear previous analysis when switching modes
+                                    setAnalysis(null)
+                                    setError(null)
+                                }
+                            }}
                             className={`flex-1 py-3 rounded-lg font-medium transition ${inputMode === 'image'
                                 ? 'bg-blue-600 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -171,10 +227,42 @@ export default function MealLogForm() {
                                             alt="Meal preview"
                                             className="max-h-64 mx-auto rounded-lg"
                                         />
+
+                                        {/* Food detection status indicator */}
+                                        <div className="flex flex-col items-center gap-2">
+                                            {isCheckingFood ? (
+                                                <span className="text-blue-600 animate-pulse">
+                                                    ⏳ Checking if image contains food...
+                                                </span>
+                                            ) : isFoodValid ? (
+                                                <span className="text-green-600">
+                                                    ✅ Food detected
+                                                </span>
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <span className="text-red-600">
+                                                        ❌ Not recognized as food
+                                                    </span>
+                                                    <button
+                                                        onClick={() => {
+                                                            setIsFoodValid(true)
+                                                            setError(null)
+                                                        }}
+                                                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                                                    >
+                                                        🔓 This is food, analyze anyway
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <button
                                             onClick={() => {
                                                 setImageFile(null)
                                                 setImagePreview(null)
+                                                setIsFoodValid(false)
+                                                setDetectedFoodClass(null)
+                                                setError(null)
                                             }}
                                             className="text-red-600 hover:underline"
                                         >
@@ -275,13 +363,70 @@ export default function MealLogForm() {
 
                     <button
                         onClick={handleAnalyze}
-                        disabled={inputMode === 'text' ? !textInput : !imageFile}
+                        disabled={
+                            inputMode === 'text'
+                                ? !textInput
+                                : (!imageFile || isCheckingFood || !isFoodValid)
+                        }
                         className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium disabled:opacity-50 hover:opacity-90 transition"
                     >
-                        🔍 Analyze with AI
+                        {isCheckingFood ? '⏳ Checking...' : '🔍 Analyze with AI'}
                     </button>
                 </div>
             )}
+
+            {step === 'preview' && !analysis && (
+                <div className="text-center py-12">
+                    <div
+                        className="text-5xl mb-4 inline-block"
+                        style={{
+                            animation: 'hourglassJumpSpin 3s ease-in-out infinite'
+                        }}
+                    >⏳</div>
+                    <style>{`
+                        @keyframes hourglassJumpSpin {
+                            0% {
+                                transform: translateY(0) rotate(0deg);
+                            }
+                            /* 平滑旋转半圈 */
+                            25% {
+                                transform: translateY(0) rotate(180deg);
+                            }
+                            /* 保持半圈，准备弹跳 */
+                            30% {
+                                transform: translateY(0) rotate(180deg);
+                            }
+                            /* 弹跳上升 */
+                            40% {
+                                transform: translateY(-15px) rotate(180deg);
+                            }
+                            /* 弹跳落下 */
+                            50% {
+                                transform: translateY(0) rotate(180deg);
+                            }
+                            /* 再旋转半圈 */
+                            75% {
+                                transform: translateY(0) rotate(360deg);
+                            }
+                            /* 保持一圈，准备弹跳 */
+                            80% {
+                                transform: translateY(0) rotate(360deg);
+                            }
+                            /* 弹跳上升 */
+                            90% {
+                                transform: translateY(-15px) rotate(360deg);
+                            }
+                            /* 弹跳落下，回到起点 */
+                            100% {
+                                transform: translateY(0) rotate(360deg);
+                            }
+                        }
+                    `}</style>
+                    <p className="text-lg text-gray-600 font-medium">AI is analyzing your meal...</p>
+                    <p className="text-sm text-gray-400 mt-2">This may take a few seconds</p>
+                </div>
+            )}
+
 
             {step === 'preview' && analysis && (
                 <div className="space-y-6">
@@ -292,11 +437,18 @@ export default function MealLogForm() {
                         <div className="space-y-3">
                             {analysis.items.map((item, idx) => (
                                 <div key={idx} className="flex justify-between items-center bg-white p-3 rounded">
-                                    <div>
-                                        <span className="font-medium">{item.name}</span>
-                                        <span className="text-gray-500 ml-2">({item.quantity})</span>
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-medium">{item.name}</span>
+                                            <span className="text-gray-500">({item.quantity})</span>
+                                        </div>
+                                        <div className="flex gap-3 mt-1 text-xs">
+                                            <span className="text-red-500 font-medium">P: {item.nutrition.protein}g</span>
+                                            <span className="text-yellow-600 font-medium">C: {item.nutrition.carbs}g</span>
+                                            <span className="text-blue-500 font-medium">F: {item.nutrition.fat}g</span>
+                                        </div>
                                     </div>
-                                    <span className="text-blue-600 font-semibold">
+                                    <span className="text-green-600 font-semibold whitespace-nowrap ml-3">
                                         {item.nutrition.calories} kcal
                                     </span>
                                 </div>

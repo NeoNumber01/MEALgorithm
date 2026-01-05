@@ -1,105 +1,416 @@
-# 🔐 安全配置指南 / Security Configuration Guide
+# 🔐 Security & Setup Guide
 
-## ⚠️ 重要安全提醒 / Important Security Notice
-
-**永远不要在代码中硬编码 API 密钥！**  
-**Never hardcode API keys in your code!**
+This document covers security best practices and complete local development setup for MEALgorithm.
 
 ---
 
-## 📋 配置步骤 / Setup Steps
+## 📋 Table of Contents
 
-### 1. 创建本地环境文件 / Create Local Environment File
+1. [Security Architecture](#-security-architecture)
+2. [Prerequisites](#-prerequisites)
+3. [Local Development Setup](#-local-development-setup)
+4. [Database Configuration](#-database-configuration)
+5. [Edge Functions Deployment](#-edge-functions-deployment)
+6. [Environment Variables](#-environment-variables)
+7. [Key Security Practices](#-key-security-practices)
+8. [Troubleshooting](#-troubleshooting)
 
-复制示例文件并填入您的真实密钥：
-```bash
-cp .env.example .env.local
+---
+
+## 🏰 Security Architecture
+
+MEALgorithm implements a **defense-in-depth** security model:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Client (Browser)                         │
+│  • Only has access to NEXT_PUBLIC_* env variables               │
+│  • GEMINI_API_KEY is NEVER exposed here                         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ (JWT Token in Authorization header)
+┌─────────────────────────────────────────────────────────────────┐
+│                    Next.js Server Actions                       │
+│  • Validates user session                                       │
+│  • Forwards requests to Edge Functions                          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 Supabase Edge Functions (Deno)                  │
+│  • Verifies JWT internally (even with --no-verify-jwt)          │
+│  • Has access to GEMINI_API_KEY via secrets                     │
+│  • All AI API calls happen here                                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Supabase PostgreSQL                          │
+│  • Row Level Security (RLS) enforced on all tables              │
+│  • Users can only access their own data                         │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2. 获取 API 密钥 / Get API Keys
+### Key Security Features
 
-#### Supabase 密钥
-1. 访问 [Supabase Dashboard](https://supabase.com/dashboard)
-2. 选择您的项目 → Settings → API
-3. 复制以下值：
-   - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
-   - `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+| Feature | Implementation |
+|---------|----------------|
+| **API Key Protection** | GEMINI_API_KEY stored only in Edge Function secrets |
+| **Row Level Security** | All tables have RLS policies enforcing user isolation |
+| **OAuth Authentication** | Google/GitHub OAuth - no password storage |
+| **JWT Verification** | Edge Functions verify tokens before processing |
+| **CORS Whitelist** | Edge Functions only accept requests from trusted origins |
 
-#### Gemini AI 密钥
-1. 访问 [Google AI Studio](https://aistudio.google.com/apikey)
-2. 创建新的 API 密钥
-3. 复制到 `GEMINI_API_KEY`
+---
 
-### 3. 配置 .env.local 文件
+## 📦 Prerequisites
+
+Before starting, ensure you have:
+
+- **Node.js 18+** - [Download](https://nodejs.org/)
+- **npm** or **pnpm** - Comes with Node.js
+- **Supabase CLI** - Install globally:
+  ```bash
+  npm install -g supabase
+  ```
+- **Git** - [Download](https://git-scm.com/)
+
+### Required Accounts
+
+| Service | Purpose | Sign Up |
+|---------|---------|---------|
+| **Supabase** | Database, Auth, Edge Functions | [supabase.com](https://supabase.com/) |
+| **Google AI Studio** | Gemini API Key | [ai.google.dev](https://ai.google.dev/) |
+
+---
+
+## 🚀 Local Development Setup
+
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/NeoNumber01/MEALgorithm.git
+cd MEALgorithm
+```
+
+### Step 2: Install Dependencies
+
+```bash
+npm install
+```
+
+### Step 3: Create Supabase Project
+
+1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
+2. Click **"New Project"**
+3. Fill in:
+   - **Name**: `mealgorithm` (or your preferred name)
+   - **Database Password**: Generate a strong password (save it securely)
+   - **Region**: Choose the closest to your users
+4. Wait for the project to initialize (~2 minutes)
+
+### Step 4: Get Your Supabase Credentials
+
+1. In your Supabase project, go to **Settings → API**
+2. Note down these values:
+   - **Project URL**: `https://<project-id>.supabase.co`
+   - **anon public key**: `sb_publishable_...` or `eyJ...` format
+
+### Step 5: Get Your Gemini API Key
+
+1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
+2. Click **"Create API Key"**
+3. Copy the generated key (starts with `AIza...`)
+
+---
+
+## 🗄️ Database Configuration
+
+### Run Database Migrations
+
+MEALgorithm requires three migration files to set up the database schema.
+
+#### Option A: Using Supabase Dashboard (Recommended for beginners)
+
+1. Go to **SQL Editor** in your Supabase project
+2. Copy and paste each migration file content in order:
+
+**Migration 1: Initial Schema** (`supabase/migrations/20240101000000_init_schema.sql`)
+```sql
+-- Creates: profiles, meals, food_catalog tables
+-- Enables: RLS policies for user data isolation
+-- Sets up: Auto-profile creation trigger on user signup
+```
+
+**Migration 2: Profile Stats** (`supabase/migrations/20240102000000_add_profile_stats.sql`)
+```sql
+-- Adds: Cache columns to profiles table
+-- Includes: food_preferences, food_dislikes, dietary_restrictions
+-- Adds: Recommendation cache columns
+```
+
+**Migration 3: Remove Image Storage** (`supabase/migrations/20240103000000_remove_image_storage.sql`)
+```sql
+-- Removes: image_path dependency (images are processed but not stored)
+```
+
+3. Execute each migration in order
+
+#### Option B: Using Supabase CLI
+
+```bash
+# Link to your project
+supabase login
+supabase link --project-ref <your-project-id>
+
+# Push all migrations
+supabase db push
+```
+
+### Configure OAuth Providers (Optional but Recommended)
+
+1. Go to **Authentication → Providers** in Supabase Dashboard
+2. Enable **Google** and/or **GitHub**:
+
+#### Google OAuth Setup
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing
+3. Enable **Google+ API**
+4. Create **OAuth 2.0 credentials**
+5. Add authorized redirect URI: `https://<project-id>.supabase.co/auth/v1/callback`
+6. Copy Client ID and Secret to Supabase
+
+#### GitHub OAuth Setup
+1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
+2. Create a new OAuth App
+3. Set Authorization callback URL: `https://<project-id>.supabase.co/auth/v1/callback`
+4. Copy Client ID and Secret to Supabase
+
+---
+
+## ⚡ Edge Functions Deployment
+
+### Step 1: Link Local Project to Supabase
+
+```bash
+supabase login
+supabase link --project-ref <your-project-id>
+```
+
+Replace `<your-project-id>` with the ID from your project URL (e.g., `abcdefghijklmnop` from `https://abcdefghijklmnop.supabase.co`).
+
+### Step 2: Set Edge Function Secrets
+
+```bash
+supabase secrets set GEMINI_API_KEY=<your-gemini-api-key>
+```
+
+**⚠️ Important**: This is the ONLY place where your Gemini API key should be stored. Never put it in `.env.local` or commit it to version control.
+
+### Step 3: Deploy All Edge Functions
+
+```bash
+# Deploy meal analysis function
+supabase functions deploy analyze-meal --no-verify-jwt
+
+# Deploy recommendations/coach function
+supabase functions deploy generate-suggestions --no-verify-jwt
+
+# Deploy general AI function
+supabase functions deploy ai-generate --no-verify-jwt
+```
+
+**Note**: `--no-verify-jwt` is required because the functions handle JWT verification internally. This allows more flexible error handling while maintaining security.
+
+### Verify Deployment
+
+```bash
+supabase functions list
+```
+
+You should see all three functions listed with status `Active`.
+
+---
+
+## 🔑 Environment Variables
+
+### Create `.env.local`
+
+In the project root, create a file named `.env.local`:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...your-key...
-GEMINI_API_KEY=AIzaSy...your-key...
+# ============================================
+# Supabase Configuration
+# ============================================
+NEXT_PUBLIC_SUPABASE_URL=https://<project-id>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_xxx
+
+# ============================================
+# Gemini API Key - DO NOT ADD HERE!
+# ============================================
+# The GEMINI_API_KEY is configured in Edge Functions via:
+#   supabase secrets set GEMINI_API_KEY=your_key
+#
+# This ensures your API key is never exposed to the frontend.
+```
+
+### Environment Variable Reference
+
+| Variable | Type | Required | Description |
+|----------|------|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Public | ✅ | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public | ✅ | Supabase anonymous key (safe for client) |
+| `GEMINI_API_KEY` | Secret | ✅ | Set via `supabase secrets set` ONLY |
+
+---
+
+## 🛡️ Key Security Practices
+
+### ✅ DO
+
+- ✅ Store `.env.local` locally only - never commit it
+- ✅ Use `supabase secrets set` for sensitive API keys
+- ✅ Enable RLS on all database tables
+- ✅ Use OAuth providers instead of email/password
+- ✅ Verify JWT tokens in Edge Functions
+- ✅ Rotate API keys periodically
+- ✅ Use different credentials for dev/staging/production
+
+### ❌ DON'T
+
+- ❌ Hardcode API keys in source code
+- ❌ Put `GEMINI_API_KEY` in `.env.local`
+- ❌ Commit `.env.local` to version control
+- ❌ Share credentials in public channels
+- ❌ Disable RLS policies
+- ❌ Use `service_role` key in client-side code
+
+---
+
+## � Running the Application
+
+### Development Mode
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Production Build
+
+```bash
+npm run build
+npm run start
+```
+
+### Desktop App (Electron)
+
+```bash
+# Development
+npm run electron:dev
+
+# Build distributable
+npm run electron:dist
 ```
 
 ---
 
-## 🛡️ 安全最佳实践 / Security Best Practices
+## 🚨 If Keys Are Leaked
 
-### ✅ 应该做的 / DO
+### Gemini API Key
 
-- ✅ 使用 `.env.local` 存储敏感信息
-- ✅ 确保 `.env.local` 在 `.gitignore` 中
-- ✅ 使用不同的密钥用于开发和生产环境
-- ✅ 定期轮换 API 密钥
-- ✅ 在 Supabase 中设置行级安全策略 (RLS)
+1. Immediately go to [Google AI Studio](https://aistudio.google.com/apikey)
+2. Delete the compromised key
+3. Create a new key
+4. Update Edge Function secrets:
+   ```bash
+   supabase secrets set GEMINI_API_KEY=<new-key>
+   ```
 
-### ❌ 不应该做的 / DON'T
+### Supabase Keys
 
-- ❌ 在代码中硬编码 API 密钥
-- ❌ 将 `.env.local` 提交到版本控制
-- ❌ 在公开仓库中分享密钥
-- ❌ 在客户端代码中使用服务端密钥
-- ❌ 将构建产物 (`dist-electron/`) 提交到版本控制
+1. Go to **Settings → API** in Supabase Dashboard
+2. Click **"Regenerate"** for the compromised key
+3. Update all applications using that key
 
----
+### Git History Cleanup
 
-## 🔑 密钥说明 / Key Descriptions
+If keys were committed to Git:
 
-| 密钥 | 类型 | 说明 |
-|------|------|------|
-| `NEXT_PUBLIC_SUPABASE_URL` | 公开 | Supabase 项目 URL，可安全暴露在客户端 |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 公开 | Supabase 匿名公钥，配合 RLS 使用是安全的 |
-| `GEMINI_API_KEY` | **敏感** | Google AI API 密钥，仅在服务端使用 |
+```bash
+# Using BFG Repo-Cleaner (recommended)
+bfg --replace-text passwords.txt
+git reflog expire --expire=now --all
+git gc --prune=now --aggressive
 
----
-
-## 🚨 如果密钥泄露 / If Keys Are Leaked
-
-如果您不小心泄露了密钥：
-
-1. **Gemini API Key**: 
-   - 立即在 [Google AI Studio](https://aistudio.google.com/apikey) 删除旧密钥
-   - 创建新密钥并更新 `.env.local`
-
-2. **Supabase Keys**:
-   - 在 Supabase Dashboard → Settings → API 重新生成密钥
-   - 更新所有使用该密钥的应用
-
-3. **检查泄露范围**:
-   - 检查 Git 历史记录
-   - 使用 `git filter-branch` 或 BFG Repo-Cleaner 清理历史
+# Or using filter-branch
+git filter-branch --force --index-filter \
+  'git rm --cached --ignore-unmatch .env.local' \
+  --prune-empty --tag-name-filter cat -- --all
+```
 
 ---
 
-## 📦 打包发布 / Distribution
+## ❓ Troubleshooting
 
-当打包 Electron 应用分发时：
+### Edge Function Returns 401 Unauthorized
 
-1. 构建产物不再包含真实的 API 密钥
-2. 用户需要自行配置 `.env.local` 文件
-3. 或者考虑使用后端代理来保护敏感 API 密钥
+**Cause**: JWT token not being passed correctly.
+
+**Solution**: Ensure `getSession()` is called before Edge Function requests:
+```typescript
+const { data: { session } } = await supabase.auth.getSession()
+const response = await fetch(url, {
+  headers: {
+    'Authorization': `Bearer ${session.access_token}`
+  }
+})
+```
+
+### "AI service not configured" Error
+
+**Cause**: `GEMINI_API_KEY` not set in Edge Functions.
+
+**Solution**:
+```bash
+supabase secrets set GEMINI_API_KEY=your_key
+supabase functions deploy <function-name> --no-verify-jwt
+```
+
+### Database RLS Blocking Queries
+
+**Cause**: Queries failing due to RLS policies.
+
+**Solution**: Ensure user is authenticated and `auth.uid()` matches `user_id`:
+```sql
+-- Check if RLS is enabled
+SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public';
+
+-- Verify policy exists
+SELECT * FROM pg_policies WHERE tablename = 'meals';
+```
+
+### OAuth Callback Errors
+
+**Cause**: Redirect URI mismatch.
+
+**Solution**: Ensure callback URL is exactly:
+```
+https://<project-id>.supabase.co/auth/v1/callback
+```
 
 ---
 
-## 📞 需要帮助？ / Need Help?
+## 📞 Need Help?
 
-- [Supabase 文档](https://supabase.com/docs)
-- [Google AI 文档](https://ai.google.dev/docs)
-- [Next.js 环境变量](https://nextjs.org/docs/app/building-your-application/configuring/environment-variables)
+- [Supabase Documentation](https://supabase.com/docs)
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Google AI Documentation](https://ai.google.dev/docs)
+- [Supabase Discord](https://discord.supabase.com/)
+
+---
+
+<p align="center">
+  <strong>Stay Secure! 🔒</strong>
+</p>

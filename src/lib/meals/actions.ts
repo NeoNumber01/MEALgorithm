@@ -62,3 +62,29 @@ export async function deleteMeal(mealId: string) {
     revalidatePath('/dashboard')
     return { success: true }
 }
+
+export async function updateMealType(
+    mealId: string,
+    mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+        return { error: 'Not authenticated' }
+    }
+
+    const { error } = await supabase
+        .from('meals')
+        .update({ meal_type: mealType })
+        .eq('id', mealId)
+        .eq('user_id', user.id)
+
+    if (error) {
+        console.error('Error updating meal type:', error)
+        return { error: error.message }
+    }
+
+    revalidatePath('/dashboard')
+    return { success: true }
+}

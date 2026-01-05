@@ -1,10 +1,8 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { getRecommendations, getDayPlan } from '@/lib/recommendations/actions'
-import PreferencesPanel from './PreferencesPanel'
-
-type ViewMode = 'next' | 'dayplan'
+import { useState, useEffect, useRef } from 'react'
+import { getNextMeal, getDayPlan } from '@/lib/suggestions/actions'
+import PreferencesModal from './PreferencesModal'
 
 interface Recommendation {
     name: string
@@ -30,57 +28,43 @@ interface DayPlanMeal {
     }
 }
 
-interface DayPlanSummary {
-    totalPlannedCalories: number
-    advice: string
-}
-
-interface DayPlanContext {
-    targetCalories: number
-    consumedCalories: number
-    remainingCalories: number
-    eatenMealTypes: string[]
-    remainingMealTypes: string[]
-}
-
 export default function RecommendationsContent() {
-    const [viewMode, setViewMode] = useState<ViewMode>('next')
+    const [viewMode, setViewMode] = useState<'next' | 'dayplan'>('next')
+    const [showPreferences, setShowPreferences] = useState(false)
 
-    // Separate loading states for each tab
+    // Next Meal state
+    const [recommendations, setRecommendations] = useState<Recommendation[]>([])
+    const [nextMealContext, setNextMealContext] = useState<{ targetCalories: number; consumedCalories: number; remainingCalories: number; goal?: string } | null>(null)
     const [nextMealLoading, setNextMealLoading] = useState(false)
-    const [dayPlanLoading, setDayPlanLoading] = useState(false)
-
-    // Track if data has been loaded (to prevent auto-refresh)
+    const [nextMealError, setNextMealError] = useState<string | null>(null)
     const nextMealLoaded = useRef(false)
+
+    // Day Plan state
+    const [dayPlan, setDayPlan] = useState<DayPlanMeal[]>([])
+    const [dayContext, setDayContext] = useState<{ targetCalories: number; consumedCalories: number; remainingCalories: number; mealsLeft: number } | null>(null)
+    const [daySummary, setDaySummary] = useState<{ totalPlannedCalories: number; advice: string } | null>(null)
+    const [dayPlanLoading, setDayPlanLoading] = useState(false)
+    const [dayPlanError, setDayPlanError] = useState<string | null>(null)
     const dayPlanLoaded = useRef(false)
 
-    // Next meal state
-    const [recommendations, setRecommendations] = useState<Recommendation[]>([])
-    const [nextMealContext, setNextMealContext] = useState<{
-        targetCalories: number
-        recentAvgCalories: number
-        goal?: string
-    } | null>(null)
-
-    // Day plan state
-    const [dayPlan, setDayPlan] = useState<DayPlanMeal[]>([])
-    const [daySummary, setDaySummary] = useState<DayPlanSummary | null>(null)
-    const [dayContext, setDayContext] = useState<DayPlanContext | null>(null)
-
-    // Initial load only - once per tab
+    // Load data when view changes
     useEffect(() => {
         if (viewMode === 'next' && !nextMealLoaded.current) {
-            loadNextMeal()
+            loadNextMeal(false)
         } else if (viewMode === 'dayplan' && !dayPlanLoaded.current) {
-            loadDayPlan()
+            loadDayPlan(false)
         }
     }, [viewMode])
 
-    const loadNextMeal = async (forceRefresh = false) => {
+    const loadNextMeal = async (forceRefresh: boolean) => {
         setNextMealLoading(true)
-        const result = await getRecommendations(forceRefresh)
+        setNextMealError(null)
 
-        if (!('error' in result)) {
+        const result = await getNextMeal(forceRefresh)
+
+        if ('error' in result) {
+            setNextMealError(result.error)
+        } else {
             setRecommendations(result.recommendations)
             setNextMealContext(result.context)
             nextMealLoaded.current = true
@@ -89,51 +73,37 @@ export default function RecommendationsContent() {
         setNextMealLoading(false)
     }
 
-    const loadDayPlan = async (forceRefresh = false) => {
+    const loadDayPlan = async (forceRefresh: boolean) => {
         setDayPlanLoading(true)
+        setDayPlanError(null)
+
         const result = await getDayPlan(forceRefresh)
 
-        if (!('error' in result)) {
+        if ('error' in result) {
+            setDayPlanError(result.error)
+        } else {
             setDayPlan(result.dayPlan)
-            setDaySummary(result.summary)
             setDayContext(result.context)
+            setDaySummary(result.summary)
             dayPlanLoaded.current = true
         }
 
         setDayPlanLoading(false)
     }
 
-    // Manual refresh handlers - force regeneration
     const handleRefreshNextMeal = () => {
         nextMealLoaded.current = false
-        loadNextMeal(true) // Force refresh
+        loadNextMeal(true)
     }
 
     const handleRefreshDayPlan = () => {
         dayPlanLoaded.current = false
-        loadDayPlan(true) // Force refresh
-    }
-
-    const getMealTypeEmoji = (type: string) => {
-        switch (type) {
-            case 'breakfast': return '🌅'
-            case 'lunch': return '☀️'
-            case 'dinner': return '🌙'
-            case 'snack': return '🍿'
-            default: return '🍽️'
-        }
+        loadDayPlan(true)
     }
 
     return (
         <div className="space-y-6">
-            {/* Food Preferences Panel */}
-            <PreferencesPanel onUpdate={() => {
-                // Reset cache flags so next load will fetch fresh data
-                nextMealLoaded.current = false
-                dayPlanLoaded.current = false
-            }} />
-
-            {/* View Toggle - Always visible */}
+            {/* View Toggle */}
             <div className="flex gap-2 bg-gray-100 p-1 rounded-lg w-fit">
                 <button
                     onClick={() => setViewMode('next')}
@@ -153,12 +123,39 @@ export default function RecommendationsContent() {
                 </button>
             </div>
 
+            {/* Food Preferences Card */}
+            <button
+                onClick={() => setShowPreferences(true)}
+                className="w-full bg-white/40 backdrop-blur-2xl border border-white/40 rounded-xl p-4 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:bg-white/60 group text-left"
+            >
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-xl shadow-md group-hover:scale-110 transition-transform">
+                            🍽️
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-gray-900">Food Preferences</h3>
+                            <p className="text-sm text-gray-500">Set your likes, dislikes & dietary needs</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-600 group-hover:translate-x-1 transition-transform">
+                        <span className="text-sm font-medium">Edit</span>
+                        <span>→</span>
+                    </div>
+                </div>
+            </button>
+
+            {/* Preferences Modal */}
+            <PreferencesModal
+                isOpen={showPreferences}
+                onClose={() => setShowPreferences(false)}
+            />
+
             {/* Next Meal View */}
             {viewMode === 'next' && (
-                <>
-                    {/* Loading State for Next Meal */}
+                <div className="space-y-6">
                     {nextMealLoading && recommendations.length === 0 && (
-                        <div className="flex flex-col items-center justify-center py-16 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20">
+                        <div className="flex flex-col items-center justify-center py-16 bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/40 shadow-lg">
                             <div className="relative mb-4">
                                 <div className="w-16 h-16 border-4 border-cyan-200 rounded-full animate-spin border-t-cyan-500" />
                                 <div className="absolute inset-0 flex items-center justify-center text-2xl animate-pulse">🍽️</div>
@@ -167,21 +164,36 @@ export default function RecommendationsContent() {
                         </div>
                     )}
 
-                    {/* Content */}
+                    {!nextMealLoading && nextMealError && recommendations.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-16 bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/40 shadow-lg">
+                            <div className="text-4xl mb-4">😕</div>
+                            <p className="text-gray-600 mb-4">{nextMealError}</p>
+                            <button
+                                onClick={handleRefreshNextMeal}
+                                className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg font-medium hover:from-cyan-600 hover:to-blue-600 transition"
+                            >
+                                🔄 Try Again
+                            </button>
+                        </div>
+                    )}
+
                     {recommendations.length > 0 && (
                         <>
-                            {/* Context Card */}
                             {nextMealContext && (
-                                <div className="bg-gradient-to-r from-cyan-500 via-sky-500 to-lime-500 rounded-xl p-6 text-white shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl">
+                                <div className="bg-gradient-to-r from-cyan-500 via-sky-500 to-lime-500 rounded-xl p-6 text-white shadow-lg backdrop-blur-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl">
                                     <h2 className="text-lg font-semibold mb-2">Personalized For You</h2>
-                                    <div className="grid grid-cols-3 gap-4 text-sm">
+                                    <div className="grid grid-cols-4 gap-4 text-sm">
                                         <div>
-                                            <p className="opacity-80">Daily Target</p>
+                                            <p className="opacity-80">Target</p>
                                             <p className="text-xl font-bold">{nextMealContext.targetCalories} kcal</p>
                                         </div>
                                         <div>
-                                            <p className="opacity-80">Recent Avg/Meal</p>
-                                            <p className="text-xl font-bold">{nextMealContext.recentAvgCalories} kcal</p>
+                                            <p className="opacity-80">Consumed</p>
+                                            <p className="text-xl font-bold">{nextMealContext.consumedCalories} kcal</p>
+                                        </div>
+                                        <div>
+                                            <p className="opacity-80">Remaining</p>
+                                            <p className="text-xl font-bold">{nextMealContext.remainingCalories} kcal</p>
                                         </div>
                                         <div>
                                             <p className="opacity-80">Goal</p>
@@ -191,26 +203,17 @@ export default function RecommendationsContent() {
                                 </div>
                             )}
 
-                            {/* Recommendations Grid */}
                             <div className="grid gap-4 md:grid-cols-3">
                                 {recommendations.map((rec, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-xl p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:bg-white/20"
-                                    >
+                                    <div key={idx} className="bg-white/40 backdrop-blur-2xl border border-white/40 rounded-xl p-6 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:bg-white/60">
                                         <div className="flex items-start justify-between mb-3">
                                             <h3 className="text-lg font-bold text-gray-900">{rec.name}</h3>
-                                            <span className="text-2xl">
-                                                {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
-                                            </span>
+                                            <span className="text-2xl">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>
                                         </div>
-
                                         <p className="text-gray-600 mb-3">{rec.description}</p>
-
                                         <div className="bg-blue-50 rounded-lg p-3 mb-3">
                                             <p className="text-sm text-blue-800">💡 {rec.reason}</p>
                                         </div>
-
                                         <div className="grid grid-cols-4 gap-2 text-center text-sm">
                                             <div className="bg-orange-50 rounded p-2">
                                                 <div className="font-bold text-orange-600">{rec.nutrition.calories}</div>
@@ -233,32 +236,30 @@ export default function RecommendationsContent() {
                                 ))}
                             </div>
 
-                            {/* Refresh Button */}
                             <div className="text-center">
                                 <button
                                     onClick={handleRefreshNextMeal}
                                     disabled={nextMealLoading}
-                                    className="text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                                    className="text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50 flex items-center gap-2 mx-auto"
                                 >
                                     {nextMealLoading ? (
-                                        <span className="flex items-center gap-2">
+                                        <>
                                             <span className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
                                             Generating...
-                                        </span>
+                                        </>
                                     ) : '🔄 Get New Suggestions'}
                                 </button>
                             </div>
                         </>
                     )}
-                </>
+                </div>
             )}
 
             {/* Day Plan View */}
             {viewMode === 'dayplan' && (
-                <>
-                    {/* Loading State for Day Plan */}
-                    {dayPlanLoading && dayPlan.length === 0 && dayContext === null && (
-                        <div className="flex flex-col items-center justify-center py-16 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20">
+                <div className="space-y-6">
+                    {dayPlanLoading && dayPlan.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-16 bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/40 shadow-lg">
                             <div className="relative mb-4">
                                 <div className="w-16 h-16 border-4 border-green-200 rounded-full animate-spin border-t-green-500" />
                                 <div className="absolute inset-0 flex items-center justify-center text-2xl animate-pulse">📅</div>
@@ -267,14 +268,29 @@ export default function RecommendationsContent() {
                         </div>
                     )}
 
-                    {/* Content */}
-                    {(dayPlan.length > 0 || dayContext !== null) && (
+                    {!dayPlanLoading && dayPlanError && dayPlan.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-16 bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/40 shadow-lg">
+                            <div className="text-4xl mb-4">😕</div>
+                            <p className="text-gray-600 mb-4">{dayPlanError}</p>
+                            <button
+                                onClick={handleRefreshDayPlan}
+                                className="px-6 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg font-medium hover:from-green-600 hover:to-teal-600 transition"
+                            >
+                                🔄 Try Again
+                            </button>
+                        </div>
+                    )}
+
+                    {(dayPlan.length > 0 || dayContext) && (
                         <>
-                            {/* Progress Context */}
                             {dayContext && (
-                                <div className="bg-gradient-to-r from-green-500 to-teal-600 rounded-xl p-6 text-white transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl">
+                                <div className="bg-gradient-to-r from-green-500 to-teal-600 rounded-xl p-6 text-white shadow-lg backdrop-blur-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl">
                                     <h2 className="text-lg font-semibold mb-4">Today&apos;s Progress</h2>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="grid grid-cols-4 gap-4">
+                                        <div>
+                                            <p className="text-sm opacity-80">Target</p>
+                                            <p className="text-2xl font-bold">{dayContext.targetCalories} kcal</p>
+                                        </div>
                                         <div>
                                             <p className="text-sm opacity-80">Consumed</p>
                                             <p className="text-2xl font-bold">{dayContext.consumedCalories} kcal</p>
@@ -284,101 +300,68 @@ export default function RecommendationsContent() {
                                             <p className="text-2xl font-bold">{dayContext.remainingCalories} kcal</p>
                                         </div>
                                         <div>
-                                            <p className="text-sm opacity-80">Target</p>
-                                            <p className="text-2xl font-bold">{dayContext.targetCalories} kcal</p>
-                                        </div>
-                                        <div>
                                             <p className="text-sm opacity-80">Meals Left</p>
-                                            <p className="text-2xl font-bold">{dayContext.remainingMealTypes.length}</p>
+                                            <p className="text-2xl font-bold">{dayContext.mealsLeft}</p>
                                         </div>
                                     </div>
-
-                                    {dayContext.eatenMealTypes.length > 0 && (
-                                        <p className="mt-4 text-sm opacity-80">
-                                            ✅ Already eaten: {dayContext.eatenMealTypes.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ')}
-                                        </p>
-                                    )}
                                 </div>
                             )}
 
-                            {/* Day Plan Timeline */}
-                            <div className="space-y-4">
-                                {dayPlan.length === 0 ? (
-                                    <div className="text-center py-8 text-gray-500">
-                                        <p className="text-4xl mb-2">🎉</p>
-                                        <p>You&apos;ve completed all meals for today!</p>
-                                    </div>
-                                ) : (
-                                    dayPlan.map((meal, idx) => (
-                                        <div
-                                            key={idx}
-                                            className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-xl p-6 flex gap-4 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:bg-white/20"
-                                        >
-                                            <div className="text-4xl">
-                                                {getMealTypeEmoji(meal.mealType)}
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="flex justify-between items-start">
+                            {dayPlan.length > 0 && (
+                                <div className="space-y-4">
+                                    {dayPlan.map((meal, idx) => (
+                                        <div key={idx} className="bg-white/40 backdrop-blur-2xl border border-white/40 rounded-xl p-6 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:bg-white/60">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-2xl">
+                                                        {meal.mealType === 'breakfast' ? '🌅' :
+                                                            meal.mealType === 'lunch' ? '☀️' :
+                                                                meal.mealType === 'dinner' ? '🌙' : '🍎'}
+                                                    </span>
                                                     <div>
-                                                        <span className="text-sm font-medium text-gray-500 uppercase">
-                                                            {meal.mealType}
-                                                        </span>
-                                                        <h3 className="text-xl font-bold text-gray-900">{meal.name}</h3>
-                                                        <p className="text-gray-600 mt-1">{meal.description}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <span className="text-2xl font-bold text-orange-600">
-                                                            {meal.nutrition.calories}
-                                                        </span>
-                                                        <span className="text-gray-500 text-sm"> kcal</span>
+                                                        <p className="text-sm text-gray-500 capitalize">{meal.mealType}</p>
+                                                        <h3 className="text-lg font-bold text-gray-900">{meal.name}</h3>
                                                     </div>
                                                 </div>
-
-                                                <div className="flex gap-4 mt-3 text-sm">
-                                                    <span className="text-red-600">🥩 {meal.nutrition.protein}g protein</span>
-                                                    <span className="text-yellow-600">🍞 {meal.nutrition.carbs}g carbs</span>
-                                                    <span className="text-blue-600">🧈 {meal.nutrition.fat}g fat</span>
+                                                <div className="text-right">
+                                                    <p className="text-2xl font-bold text-orange-500">{meal.nutrition.calories}</p>
+                                                    <p className="text-xs text-gray-500">kcal</p>
                                                 </div>
                                             </div>
+                                            <p className="text-gray-600 mb-3">{meal.description}</p>
+                                            <div className="flex gap-4 text-sm">
+                                                <span className="text-red-600">P: {meal.nutrition.protein}g</span>
+                                                <span className="text-yellow-600">C: {meal.nutrition.carbs}g</span>
+                                                <span className="text-blue-600">F: {meal.nutrition.fat}g</span>
+                                            </div>
                                         </div>
-                                    ))
-                                )}
-                            </div>
-
-                            {/* Day Summary */}
-                            {daySummary && dayPlan.length > 0 && (
-                                <div className="bg-blue-50/20 backdrop-blur-xl border border-blue-200/20 rounded-xl p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:bg-blue-50/40">
-                                    <div className="flex items-center gap-4 mb-3">
-                                        <span className="text-3xl">💡</span>
-                                        <div>
-                                            <h3 className="font-semibold text-blue-900">AI Coach Advice</h3>
-                                            <p className="text-blue-800">{daySummary.advice}</p>
-                                        </div>
-                                    </div>
-                                    <p className="text-sm text-blue-600">
-                                        Planned calories: {daySummary.totalPlannedCalories} kcal
-                                    </p>
+                                    ))}
                                 </div>
                             )}
 
-                            {/* Refresh Button */}
+                            {daySummary && (
+                                <div className="bg-blue-50/50 backdrop-blur-2xl rounded-xl p-4 border border-blue-200/40 shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+                                    <p className="text-blue-800">💡 {daySummary.advice}</p>
+                                </div>
+                            )}
+
                             <div className="text-center">
                                 <button
                                     onClick={handleRefreshDayPlan}
                                     disabled={dayPlanLoading}
-                                    className="text-green-600 hover:text-green-800 font-medium disabled:opacity-50"
+                                    className="text-green-600 hover:text-green-800 font-medium disabled:opacity-50 flex items-center gap-2 mx-auto"
                                 >
                                     {dayPlanLoading ? (
-                                        <span className="flex items-center gap-2">
+                                        <>
                                             <span className="w-4 h-4 border-2 border-green-300 border-t-green-600 rounded-full animate-spin" />
                                             Generating...
-                                        </span>
+                                        </>
                                     ) : '🔄 Regenerate Day Plan'}
                                 </button>
                             </div>
                         </>
                     )}
-                </>
+                </div>
             )}
         </div>
     )

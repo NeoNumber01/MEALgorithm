@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { getStatsForRange, getDailyStats, getUserProfile } from '@/lib/dashboard/actions'
-import { generateStatisticsInsight } from '@/lib/dashboard/ai-feedback'
-import { getLastDataUpdateTime, getLastGoalUpdateTime, generateDataHash } from '@/lib/cache-utils'
+import { getLastDataUpdateTime, getLastGoalUpdateTime, notifyDataUpdated } from '@/lib/cache-utils'
+import { updateMealType, deleteMeal } from '@/lib/meals/actions'
 import DayDetailModal from './DayDetailModal'
 import MealDetailModal from './MealDetailModal'
+import AICoachCard from './AICoachCard'
 
 type TimeRange = '3d' | '7d' | '14d' | '30d' | '90d' | '365d' | 'custom'
 
@@ -42,9 +43,10 @@ interface StatsData {
 interface StatisticsViewProps {
     targetCalories: number
     lastUpdateTimestamp: number
+    onDataUpdate?: () => void
 }
 
-export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: StatisticsViewProps) {
+export default function StatisticsView({ targetCalories, lastUpdateTimestamp, onDataUpdate }: StatisticsViewProps) {
     const [timeRange, setTimeRange] = useState<TimeRange>('7d')
     const [customStart, setCustomStart] = useState('')
     const [customEnd, setCustomEnd] = useState('')
@@ -58,10 +60,9 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
         totals: { calories: number; protein: number; carbs: number; fat: number }
     } | null>(null)
     const [dayLoading, setDayLoading] = useState(false)
-    const [aiInsight, setAiInsight] = useState<string>('')
-    const [insightLoading, setInsightLoading] = useState(false)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedMeal, setSelectedMeal] = useState<any>(null)
+    const [goalDescription, setGoalDescription] = useState<string | undefined>()
 
     const timeRangeOptions: { value: TimeRange; label: string; days?: number }[] = [
         { value: '3d', label: '3 Days', days: 3 },
@@ -119,10 +120,7 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
         const { start, end } = getDateRange()
         if (!start || !end) return
 
-        // Cache key based on range and timestamps
         const cacheKeyData = `stats_data_${timeRange}_${start}_${end}`
-        const cacheKeyInsight = `stats_insight_${timeRange}_${start}_${end}`
-        const cacheKeyInsightHash = `stats_insight_hash_${timeRange}_${start}_${end}`
 
         // Check cache validity against global last update
         const lastDbUpdate = getLastDataUpdateTime()
@@ -130,18 +128,16 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
 
         try {
             const cachedDataStr = localStorage.getItem(cacheKeyData)
-            const cachedInsight = localStorage.getItem(cacheKeyInsight)
 
             if (cachedDataStr) {
                 const { data, timestamp } = JSON.parse(cachedDataStr)
 
-                // Check if cache is newer than last DB update AND not too old (e.g. 24h)
+                // Use cached data ONLY if:
+                // 1. Cache is newer than last DB update
+                // 2. Cache is newer than last goal update
+                // 3. Cache is not too old (24 hours)
                 if (timestamp > lastDbUpdate && timestamp > lastGoalUpdate && (Date.now() - timestamp < 86400000)) {
                     setStats(data)
-                    if (cachedInsight) {
-                        console.log('Stats AI Insight: Using cached insight (no data change)')
-                        setAiInsight(cachedInsight)
-                    }
                     setLoading(false)
                     return
                 }
@@ -151,7 +147,6 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
         }
 
         setLoading(true)
-        setAiInsight('')
 
         const timezoneOffset = new Date().getTimezoneOffset()
 
@@ -169,74 +164,11 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
                 data: result,
                 timestamp: cacheTimestamp
             }))
+        }
 
-            // Generate AI insight only if data actually changed
-            if (result.days.length > 0) {
-                const currentOption = timeRangeOptions.find(o => o.value === timeRange)
-                const periodLabel = currentOption?.label || 'Selected Period'
-
-                // Calculate consistency score and streak
-                const daysOnTarget = result.days.filter(d =>
-                    d.calories >= targetCalories * 0.9 && d.calories <= targetCalories * 1.1
-                )
-                const consistencyScore = Math.round((daysOnTarget.length / result.days.length) * 100)
-
-                let currentStreak = 0
-                for (let i = result.days.length - 1; i >= 0; i--) {
-                    const day = result.days[i]
-                    if (day.calories >= targetCalories * 0.9 && day.calories <= targetCalories * 1.1) {
-                        currentStreak++
-                    } else {
-                        break
-                    }
-                }
-
-                // Create hash to check if data actually changed
-                const insightDataHash = generateDataHash({
-                    totalDays: result.summary.totalDays,
-                    daysWithMeals: result.summary.daysWithMeals,
-                    totalMeals: result.summary.totalMeals,
-                    avgCalories: result.averages.calories,
-                    avgProtein: result.averages.protein,
-                    consistencyScore,
-                    currentStreak,
-                    targetCalories,
-                    goalDescription: !('error' in profileResult) ? profileResult.profile?.goal_description : undefined,
-                })
-
-                const cachedInsightHash = localStorage.getItem(cacheKeyInsightHash)
-                const cachedInsight = localStorage.getItem(cacheKeyInsight)
-
-                // Only call AI if data actually changed
-                if (cachedInsightHash !== insightDataHash || !cachedInsight) {
-                    console.log('Stats AI Insight: Data changed, regenerating...', { cachedInsightHash, insightDataHash })
-                    setInsightLoading(true)
-                    
-                    const insightResult = await generateStatisticsInsight({
-                        periodLabel,
-                        totalDays: result.summary.totalDays,
-                        daysWithMeals: result.summary.daysWithMeals,
-                        totalMeals: result.summary.totalMeals,
-                        avgCalories: result.averages.calories,
-                        avgProtein: result.averages.protein,
-                        avgCarbs: result.averages.carbs,
-                        avgFat: result.averages.fat,
-                        targetCalories,
-                        consistencyScore,
-                        currentStreak,
-                        goalDescription: !('error' in profileResult) ? profileResult.profile?.goal_description : undefined,
-                    })
-
-                    setAiInsight(insightResult.insight)
-                    localStorage.setItem(cacheKeyInsight, insightResult.insight)
-                    localStorage.setItem(cacheKeyInsightHash, insightDataHash)
-                    setInsightLoading(false)
-                } else {
-                    // Use cached insight - no AI call needed
-                    console.log('Stats AI Insight: Using cached insight (hash match)')
-                    setAiInsight(cachedInsight)
-                }
-            }
+        // Save goal description from profile
+        if (!('error' in profileResult) && profileResult.profile) {
+            setGoalDescription(profileResult.profile.goal_description || undefined)
         }
         setLoading(false)
     }
@@ -270,6 +202,59 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
             })
         }
         setDayLoading(false)
+    }
+
+    const handleMealTypeChange = async (mealId: string, newType: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
+        const result = await updateMealType(mealId, newType)
+
+        if (result?.success) {
+            notifyDataUpdated()
+            // Update selectedDay meals locally
+            if (selectedDay) {
+                const updatedMeals = selectedDay.meals.map((meal: { id: string; mealType?: string }) =>
+                    meal.id === mealId ? { ...meal, mealType: newType } : meal
+                )
+                setSelectedDay({ ...selectedDay, meals: updatedMeals })
+            }
+            // Update selectedMeal if it's the one being edited
+            if (selectedMeal?.id === mealId) {
+                setSelectedMeal({ ...selectedMeal, mealType: newType })
+            }
+            // Invalidate stats cache and reload stats to update Meal Type Distribution
+            const { start, end } = getDateRange()
+            if (start && end) {
+                const cacheKeyData = `stats_data_${timeRange}_${start}_${end}`
+                localStorage.removeItem(cacheKeyData)
+            }
+            // Reload stats to update the Meal Type Distribution chart
+            await loadStats()
+            onDataUpdate?.()
+        }
+    }
+
+    const handleDeleteMeal = async (mealId: string) => {
+        const result = await deleteMeal(mealId)
+        if (result?.success) {
+            notifyDataUpdated()
+
+            // Remove from selectedDay locally
+            if (selectedDay) {
+                const updatedMeals = selectedDay.meals.filter((m: { id: string }) => m.id !== mealId)
+                setSelectedDay({ ...selectedDay, meals: updatedMeals })
+            }
+
+            // Close modal
+            setSelectedMeal(null)
+
+            // Invalidate stats cache and reload
+            const { start, end } = getDateRange()
+            if (start && end) {
+                const cacheKeyData = `stats_data_${timeRange}_${start}_${end}`
+                localStorage.removeItem(cacheKeyData)
+            }
+            await loadStats()
+            onDataUpdate?.()
+        }
     }
 
     const getMealTypeEmoji = (type: string) => {
@@ -521,27 +506,27 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
                 </div>
             </div>
 
-            {/* AI Coach Insight */}
-            {(aiInsight || insightLoading) && (
-                <div className="relative overflow-hidden bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-lg">
-                    <div className="absolute -right-4 -bottom-4 text-8xl opacity-10">🤖</div>
-                    <div className="relative flex gap-4">
-                        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl flex items-center justify-center text-2xl shadow-lg">
-                            🤖
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="font-bold text-emerald-800 mb-1">AI Coach Insight</h3>
-                            {insightLoading ? (
-                                <div className="flex items-center gap-2 text-emerald-600">
-                                    <div className="w-4 h-4 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" />
-                                    <span className="animate-pulse">Analyzing your eating patterns...</span>
-                                </div>
-                            ) : (
-                                <p className="text-emerald-700 leading-relaxed">{aiInsight}</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
+            {/* AI Coach */}
+            {stats.summary.totalMeals > 0 && insights && (
+                <AICoachCard
+                    context="statistics"
+                    targetCalories={targetCalories}
+                    goalDescription={goalDescription}
+                    statsData={{
+                        avgCalories: stats.averages.calories,
+                        avgProtein: stats.averages.protein,
+                        avgCarbs: stats.averages.carbs,
+                        avgFat: stats.averages.fat,
+                        totalMeals: stats.summary.totalMeals,
+                        daysWithMeals: stats.summary.daysWithMeals,
+                        totalDays: stats.summary.totalDays,
+                        consistencyScore: insights.consistencyScore,
+                        avgMealsPerDay: stats.summary.avgMealsPerDay,
+                        avgProteinPerMeal: insights.avgProteinPerMeal,
+                        timeRangeLabel: timeRangeOptions.find(o => o.value === timeRange)?.label || timeRange,
+                        macroBalance: macroBalance || undefined,
+                    }}
+                />
             )}
 
             {/* Macro Balance Visual */}
@@ -801,6 +786,8 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp }: 
                 <MealDetailModal
                     meal={selectedMeal}
                     onClose={() => setSelectedMeal(null)}
+                    onMealTypeChange={handleMealTypeChange}
+                    onDelete={handleDeleteMeal}
                 />
             )}
 

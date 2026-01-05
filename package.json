@@ -12,7 +12,8 @@
     "electron:dev": "concurrently \"cross-env NODE_ENV=development npm run dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
     "electron:prepare": "node scripts/prepare-electron.js",
     "electron:build": "npm run build && npm run electron:prepare && electron-builder --win --dir",
-    "electron:dist": "npm run build && npm run electron:prepare && electron-builder --win"
+    "electron:dist": "npm run build && npm run electron:prepare && electron-builder --win",
+    "model:setup": "npx ts-node scripts/download-food-model.ts"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",
@@ -21,8 +22,10 @@
     "@supabase/supabase-js": "^2.89.0",
     "lucide-react": "^0.562.0",
     "next": "14.2.35",
+    "onnxruntime-node": "^1.23.2",
     "react": "^18",
     "react-dom": "^18",
+    "sharp": "^0.34.5",
     "zod": "^4.3.4"
   },
   "devDependencies": {
