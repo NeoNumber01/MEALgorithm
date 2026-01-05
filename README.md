@@ -143,7 +143,7 @@ All AI inference tasks run on Supabase Edge Functions, ensuring:
 │                              ▼                                  │
 │                  ┌────────────────────┐                         │
 │                  │  Google Gemini API │                         │
-│                  │  (gemini-2.0-flash)│                         │
+│                  │  (gemini-3-flash)│                         │
 │                  └────────────────────┘                         │
 └─────────────────────────────────────────────────────────────────┘
 ```
