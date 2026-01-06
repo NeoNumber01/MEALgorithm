@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getNextMeal, getDayPlan } from '@/lib/suggestions/actions'
 import PreferencesModal from './PreferencesModal'
+import { formatNumber } from '@/lib/format-utils'
 
 interface Recommendation {
     name: string
@@ -185,15 +186,15 @@ export default function RecommendationsContent() {
                                     <div className="grid grid-cols-4 gap-4 text-sm">
                                         <div>
                                             <p className="opacity-80">Target</p>
-                                            <p className="text-xl font-bold">{nextMealContext.targetCalories} kcal</p>
+                                            <p className="text-xl font-bold">{formatNumber(nextMealContext.targetCalories)} kcal</p>
                                         </div>
                                         <div>
                                             <p className="opacity-80">Consumed</p>
-                                            <p className="text-xl font-bold">{nextMealContext.consumedCalories} kcal</p>
+                                            <p className="text-xl font-bold">{formatNumber(nextMealContext.consumedCalories)} kcal</p>
                                         </div>
                                         <div>
                                             <p className="opacity-80">Remaining</p>
-                                            <p className="text-xl font-bold">{nextMealContext.remainingCalories} kcal</p>
+                                            <p className="text-xl font-bold">{formatNumber(nextMealContext.remainingCalories)} kcal</p>
                                         </div>
                                         <div>
                                             <p className="opacity-80">Goal</p>
@@ -216,19 +217,19 @@ export default function RecommendationsContent() {
                                         </div>
                                         <div className="grid grid-cols-4 gap-2 text-center text-sm">
                                             <div className="bg-orange-50 rounded p-2">
-                                                <div className="font-bold text-orange-600">{rec.nutrition.calories}</div>
+                                                <div className="font-bold text-orange-600">{formatNumber(rec.nutrition.calories)}</div>
                                                 <div className="text-xs text-gray-500">kcal</div>
                                             </div>
                                             <div className="bg-red-50 rounded p-2">
-                                                <div className="font-bold text-red-600">{rec.nutrition.protein}g</div>
+                                                <div className="font-bold text-red-600">{formatNumber(rec.nutrition.protein)}g</div>
                                                 <div className="text-xs text-gray-500">protein</div>
                                             </div>
                                             <div className="bg-yellow-50 rounded p-2">
-                                                <div className="font-bold text-yellow-600">{rec.nutrition.carbs}g</div>
+                                                <div className="font-bold text-yellow-600">{formatNumber(rec.nutrition.carbs)}g</div>
                                                 <div className="text-xs text-gray-500">carbs</div>
                                             </div>
                                             <div className="bg-blue-50 rounded p-2">
-                                                <div className="font-bold text-blue-600">{rec.nutrition.fat}g</div>
+                                                <div className="font-bold text-blue-600">{formatNumber(rec.nutrition.fat)}g</div>
                                                 <div className="text-xs text-gray-500">fat</div>
                                             </div>
                                         </div>
@@ -289,15 +290,15 @@ export default function RecommendationsContent() {
                                     <div className="grid grid-cols-4 gap-4">
                                         <div>
                                             <p className="text-sm opacity-80">Target</p>
-                                            <p className="text-2xl font-bold">{dayContext.targetCalories} kcal</p>
+                                            <p className="text-2xl font-bold">{formatNumber(dayContext.targetCalories)} kcal</p>
                                         </div>
                                         <div>
                                             <p className="text-sm opacity-80">Consumed</p>
-                                            <p className="text-2xl font-bold">{dayContext.consumedCalories} kcal</p>
+                                            <p className="text-2xl font-bold">{formatNumber(dayContext.consumedCalories)} kcal</p>
                                         </div>
                                         <div>
                                             <p className="text-sm opacity-80">Remaining</p>
-                                            <p className="text-2xl font-bold">{dayContext.remainingCalories} kcal</p>
+                                            <p className="text-2xl font-bold">{formatNumber(dayContext.remainingCalories)} kcal</p>
                                         </div>
                                         <div>
                                             <p className="text-sm opacity-80">Meals Left</p>
@@ -324,15 +325,15 @@ export default function RecommendationsContent() {
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-2xl font-bold text-orange-500">{meal.nutrition.calories}</p>
+                                                    <p className="text-2xl font-bold text-orange-500">{formatNumber(meal.nutrition.calories)}</p>
                                                     <p className="text-xs text-gray-500">kcal</p>
                                                 </div>
                                             </div>
                                             <p className="text-gray-600 mb-3">{meal.description}</p>
                                             <div className="flex gap-4 text-sm">
-                                                <span className="text-red-600">P: {meal.nutrition.protein}g</span>
-                                                <span className="text-yellow-600">C: {meal.nutrition.carbs}g</span>
-                                                <span className="text-blue-600">F: {meal.nutrition.fat}g</span>
+                                                <span className="text-red-600">P: {formatNumber(meal.nutrition.protein)}g</span>
+                                                <span className="text-yellow-600">C: {formatNumber(meal.nutrition.carbs)}g</span>
+                                                <span className="text-blue-600">F: {formatNumber(meal.nutrition.fat)}g</span>
                                             </div>
                                         </div>
                                     ))}

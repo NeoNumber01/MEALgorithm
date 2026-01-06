@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { formatNumberLocale } from '@/lib/format-utils'
 
 interface CalorieGaugeProps {
     current: number
@@ -108,13 +109,13 @@ export default function CalorieGauge({ current, target, label = "Today's Calorie
 
                     {/* Main Number */}
                     <div className={`text-5xl font-extrabold tracking-tight ${statusColorClass} drop-shadow-sm`}>
-                        {current.toLocaleString()}
+                        {formatNumberLocale(current)}
                     </div>
 
                     {/* Subtext */}
                     <div className="flex items-center gap-2 mt-2 mb-1">
                         <span className="text-sm font-medium text-gray-400">
-                            / {target.toLocaleString()} kcal
+                            / {formatNumberLocale(target)} kcal
                         </span>
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 ${statusColorClass}`}>
                             {Math.round(percentage)}%

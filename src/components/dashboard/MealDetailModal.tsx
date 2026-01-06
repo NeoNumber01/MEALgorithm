@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { formatNumber } from '@/lib/format-utils'
 
 interface NutritionalInfo {
     calories: number
@@ -36,6 +37,7 @@ interface MealDetailModalProps {
     onClose: () => void
     onMealTypeChange?: (mealId: string, newType: MealType) => Promise<void>
     onDelete?: (mealId: string) => Promise<void>
+    onDateTimeChange?: (mealId: string, newDateTime: string) => Promise<void>
 }
 
 const MEAL_TYPE_OPTIONS: { value: MealType; label: string; emoji: string }[] = [
@@ -45,10 +47,13 @@ const MEAL_TYPE_OPTIONS: { value: MealType; label: string; emoji: string }[] = [
     { value: 'snack', label: 'Snack', emoji: '🍿' },
 ]
 
-export default function MealDetailModal({ meal, onClose, onMealTypeChange, onDelete }: MealDetailModalProps) {
+export default function MealDetailModal({ meal, onClose, onMealTypeChange, onDelete, onDateTimeChange }: MealDetailModalProps) {
     const [isVisible, setIsVisible] = useState(false)
     const [isEditingType, setIsEditingType] = useState(false)
+    const [isEditingDateTime, setIsEditingDateTime] = useState(false)
     const [currentMealType, setCurrentMealType] = useState<string>(meal.mealType || 'meal')
+    const [currentDateTime, setCurrentDateTime] = useState<string>(meal.createdAt)
+    const [editingDateTime, setEditingDateTime] = useState<string>('')
     const [isUpdating, setIsUpdating] = useState(false)
 
     useEffect(() => {
@@ -66,6 +71,11 @@ export default function MealDetailModal({ meal, onClose, onMealTypeChange, onDel
     useEffect(() => {
         setCurrentMealType(meal.mealType || 'meal')
     }, [meal.mealType])
+
+    // Sync current datetime with prop changes
+    useEffect(() => {
+        setCurrentDateTime(meal.createdAt)
+    }, [meal.createdAt])
 
     const handleClose = () => {
         setIsVisible(false)
@@ -93,6 +103,59 @@ export default function MealDetailModal({ meal, onClose, onMealTypeChange, onDel
     const getMealTypeEmoji = (type: string) => {
         const option = MEAL_TYPE_OPTIONS.find(o => o.value === type)
         return option?.emoji || '🍽️'
+    }
+
+    // Convert ISO string to datetime-local format (YYYY-MM-DDTHH:MM)
+    const toDateTimeLocal = (isoString: string) => {
+        const date = new Date(isoString)
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        return `${year}-${month}-${day}T${hours}:${minutes}`
+    }
+
+    // Convert datetime-local format to ISO string
+    const fromDateTimeLocal = (dateTimeLocal: string) => {
+        const date = new Date(dateTimeLocal)
+        return date.toISOString()
+    }
+
+    const handleStartEditDateTime = () => {
+        if (!onDateTimeChange) return
+        setEditingDateTime(toDateTimeLocal(currentDateTime))
+        setIsEditingDateTime(true)
+    }
+
+    const handleDateTimeCancel = () => {
+        setIsEditingDateTime(false)
+        setEditingDateTime('')
+    }
+
+    const handleDateTimeSave = async () => {
+        if (!onDateTimeChange || !editingDateTime) {
+            setIsEditingDateTime(false)
+            return
+        }
+
+        const newIsoDateTime = fromDateTimeLocal(editingDateTime)
+        if (newIsoDateTime === currentDateTime) {
+            setIsEditingDateTime(false)
+            return
+        }
+
+        setIsUpdating(true)
+        try {
+            await onDateTimeChange(meal.id, newIsoDateTime)
+            setCurrentDateTime(newIsoDateTime)
+        } catch (error) {
+            console.error('Failed to update meal date/time:', error)
+        } finally {
+            setIsUpdating(false)
+            setIsEditingDateTime(false)
+            setEditingDateTime('')
+        }
     }
 
     const handleDeleteClick = () => {
@@ -204,9 +267,48 @@ export default function MealDetailModal({ meal, onClose, onMealTypeChange, onDel
                             </button>
                         )}
                         <h2 className="text-3xl font-bold text-shadow-sm">Meal Details</h2>
-                        <p className="text-sm opacity-80">
-                            {new Date(meal.createdAt).toLocaleString()}
-                        </p>
+                        {/* DateTime Editor */}
+                        {isEditingDateTime ? (
+                            <div className="flex items-center gap-2 mt-1 animate-in fade-in duration-200">
+                                <input
+                                    type="datetime-local"
+                                    value={editingDateTime}
+                                    onChange={(e) => setEditingDateTime(e.target.value)}
+                                    disabled={isUpdating}
+                                    className="px-3 py-1.5 rounded-lg bg-white/90 text-gray-900 text-sm font-medium border-0 focus:ring-2 focus:ring-white/50 disabled:opacity-50"
+                                />
+                                <button
+                                    onClick={handleDateTimeSave}
+                                    disabled={isUpdating}
+                                    className="w-8 h-8 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-colors disabled:opacity-50 shadow-lg"
+                                    title="Save"
+                                >
+                                    {isUpdating ? (
+                                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        '✓'
+                                    )}
+                                </button>
+                                <button
+                                    onClick={handleDateTimeCancel}
+                                    disabled={isUpdating}
+                                    className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors disabled:opacity-50"
+                                    title="Cancel"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={handleStartEditDateTime}
+                                className={`text-sm opacity-80 mt-1 flex items-center gap-2 ${onDateTimeChange ? 'hover:bg-white/20 px-2 py-1 -ml-2 rounded-lg cursor-pointer transition-colors' : ''}`}
+                                disabled={!onDateTimeChange}
+                            >
+                                <span>🕐</span>
+                                <span>{new Date(currentDateTime).toLocaleString()}</span>
+                                {onDateTimeChange && <span className="text-xs opacity-70">✏️</span>}
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -215,19 +317,19 @@ export default function MealDetailModal({ meal, onClose, onMealTypeChange, onDel
                     {/* Summary Cards */}
                     <div className="grid grid-cols-4 gap-2 mb-6">
                         <div className="bg-orange-50 p-3 rounded-2xl text-center border border-orange-100">
-                            <div className="text-xl font-bold text-orange-600">{meal.analysis.summary.calories}</div>
+                            <div className="text-xl font-bold text-orange-600">{formatNumber(meal.analysis.summary.calories)}</div>
                             <div className="text-xs text-orange-400 font-medium">kcal</div>
                         </div>
                         <div className="bg-red-50 p-3 rounded-2xl text-center border border-red-100">
-                            <div className="text-lg font-bold text-red-600">{meal.analysis.summary.protein}g</div>
+                            <div className="text-lg font-bold text-red-600">{formatNumber(meal.analysis.summary.protein)}g</div>
                             <div className="text-xs text-red-400 font-medium">Protein</div>
                         </div>
                         <div className="bg-amber-50 p-3 rounded-2xl text-center border border-amber-100">
-                            <div className="text-lg font-bold text-amber-600">{meal.analysis.summary.carbs}g</div>
+                            <div className="text-lg font-bold text-amber-600">{formatNumber(meal.analysis.summary.carbs)}g</div>
                             <div className="text-xs text-amber-400 font-medium">Carbs</div>
                         </div>
                         <div className="bg-blue-50 p-3 rounded-2xl text-center border border-blue-100">
-                            <div className="text-lg font-bold text-blue-600">{meal.analysis.summary.fat}g</div>
+                            <div className="text-lg font-bold text-blue-600">{formatNumber(meal.analysis.summary.fat)}g</div>
                             <div className="text-xs text-blue-400 font-medium">Fat</div>
                         </div>
                     </div>
@@ -257,9 +359,9 @@ export default function MealDetailModal({ meal, onClose, onMealTypeChange, onDel
                                         <div className="text-sm text-gray-500">{item.quantity}</div>
                                     </div>
                                     <div className="text-right text-sm">
-                                        <div className="font-semibold text-gray-700">{item.nutrition?.calories} kcal</div>
+                                        <div className="font-semibold text-gray-700">{formatNumber(item.nutrition?.calories)} kcal</div>
                                         <div className="text-xs text-gray-400">
-                                            P:{item.nutrition?.protein} C:{item.nutrition?.carbs} F:{item.nutrition?.fat}
+                                            P:{formatNumber(item.nutrition?.protein)} C:{formatNumber(item.nutrition?.carbs)} F:{formatNumber(item.nutrition?.fat)}
                                         </div>
                                     </div>
                                 </div>

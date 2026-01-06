@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react'
 import { getStatsForRange, getDailyStats, getUserProfile } from '@/lib/dashboard/actions'
 import { getLastDataUpdateTime, getLastGoalUpdateTime, notifyDataUpdated } from '@/lib/cache-utils'
-import { updateMealType, deleteMeal } from '@/lib/meals/actions'
+import { updateMealType, deleteMeal, updateMealDateTime } from '@/lib/meals/actions'
 import DayDetailModal from './DayDetailModal'
 import MealDetailModal from './MealDetailModal'
 import AICoachCard from './AICoachCard'
+import { formatNumber, formatNumberLocale } from '@/lib/format-utils'
 
 type TimeRange = '3d' | '7d' | '14d' | '30d' | '90d' | '365d' | 'custom'
 
@@ -257,6 +258,47 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp, on
         }
     }
 
+    const handleDateTimeChange = async (mealId: string, newDateTime: string) => {
+        const result = await updateMealDateTime(mealId, newDateTime)
+        if (result?.success) {
+            notifyDataUpdated()
+
+            // Update selectedMeal if it's the one being edited
+            if (selectedMeal?.id === mealId) {
+                setSelectedMeal({ ...selectedMeal, createdAt: newDateTime })
+            }
+
+            // Invalidate stats cache and reload (meal might have moved to a different day)
+            const { start, end } = getDateRange()
+            if (start && end) {
+                const cacheKeyData = `stats_data_${timeRange}_${start}_${end}`
+                localStorage.removeItem(cacheKeyData)
+            }
+            await loadStats()
+
+            // Close day detail modal and refresh if needed
+            if (selectedDay) {
+                // Re-fetch day data as meal date might have changed
+                const newMealDate = new Date(newDateTime).toLocaleDateString('en-CA')
+                const currentDayDate = selectedDay.date
+
+                if (newMealDate !== currentDayDate) {
+                    // Meal moved to a different day, remove from current view
+                    const updatedMeals = selectedDay.meals.filter((m: { id: string }) => m.id !== mealId)
+                    setSelectedDay({ ...selectedDay, meals: updatedMeals })
+                } else {
+                    // Update the meal in the current day view
+                    const updatedMeals = selectedDay.meals.map((m: { id: string; createdAt?: string }) =>
+                        m.id === mealId ? { ...m, createdAt: newDateTime } : m
+                    )
+                    setSelectedDay({ ...selectedDay, meals: updatedMeals })
+                }
+            }
+
+            onDataUpdate?.()
+        }
+    }
+
     const getMealTypeEmoji = (type: string) => {
         switch (type) {
             case 'breakfast': return '🌅'
@@ -462,7 +504,7 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp, on
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-3xl">⭐</span>
                             <div className="text-right">
-                                <div className="text-lg font-bold text-green-600">{insights.bestDay?.calories}</div>
+                                <div className="text-lg font-bold text-green-600">{formatNumber(insights.bestDay?.calories)}</div>
                                 <div className="text-xs text-gray-400">kcal</div>
                             </div>
                         </div>
@@ -474,7 +516,7 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp, on
                     <div className="bg-white/15 backdrop-blur-2xl border border-white/20 rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-3xl">💪</span>
-                            <div className="text-3xl font-bold text-red-500">{insights.avgProteinPerMeal}g</div>
+                            <div className="text-3xl font-bold text-red-500">{formatNumber(insights.avgProteinPerMeal)}g</div>
                         </div>
                         <div className="text-sm font-semibold text-gray-900">Protein/Meal</div>
                         <div className="text-xs text-gray-500">Average per meal</div>
@@ -486,12 +528,12 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp, on
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl p-5 text-white shadow-lg hover:-translate-y-1 transition-transform">
                     <div className="text-sm opacity-90 mb-1">Total Calories</div>
-                    <div className="text-3xl font-bold">{stats.totals.calories.toLocaleString()}</div>
+                    <div className="text-3xl font-bold">{formatNumberLocale(stats.totals.calories)}</div>
                     <div className="text-xs opacity-75 mt-1">kcal consumed</div>
                 </div>
                 <div className="bg-gradient-to-br from-blue-400 to-indigo-500 rounded-2xl p-5 text-white shadow-lg hover:-translate-y-1 transition-transform">
                     <div className="text-sm opacity-90 mb-1">Daily Average</div>
-                    <div className="text-3xl font-bold">{stats.averages.calories}</div>
+                    <div className="text-3xl font-bold">{formatNumber(stats.averages.calories)}</div>
                     <div className="text-xs opacity-75 mt-1">kcal/day</div>
                 </div>
                 <div className="bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl p-5 text-white shadow-lg hover:-translate-y-1 transition-transform">
@@ -564,21 +606,21 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp, on
                             <div className="w-4 h-4 rounded-full bg-gradient-to-r from-red-400 to-red-500" />
                             <div>
                                 <div className="text-sm font-semibold text-gray-900">Protein</div>
-                                <div className="text-xs text-gray-500">{stats.totals.protein}g • {macroBalance.protein}%</div>
+                                <div className="text-xs text-gray-500">{formatNumber(stats.totals.protein)}g • {macroBalance.protein}%</div>
                             </div>
                         </div>
                         <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl">
                             <div className="w-4 h-4 rounded-full bg-gradient-to-r from-amber-400 to-amber-500" />
                             <div>
                                 <div className="text-sm font-semibold text-gray-900">Carbs</div>
-                                <div className="text-xs text-gray-500">{stats.totals.carbs}g • {macroBalance.carbs}%</div>
+                                <div className="text-xs text-gray-500">{formatNumber(stats.totals.carbs)}g • {macroBalance.carbs}%</div>
                             </div>
                         </div>
                         <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl">
                             <div className="w-4 h-4 rounded-full bg-gradient-to-r from-blue-400 to-blue-500" />
                             <div>
                                 <div className="text-sm font-semibold text-gray-900">Fat</div>
-                                <div className="text-xs text-gray-500">{stats.totals.fat}g • {macroBalance.fat}%</div>
+                                <div className="text-xs text-gray-500">{formatNumber(stats.totals.fat)}g • {macroBalance.fat}%</div>
                             </div>
                         </div>
                     </div>
@@ -617,11 +659,11 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp, on
                                     key={day.date}
                                     onClick={() => handleDayClick(day)}
                                     className={`w-7 h-7 rounded-md ${colorClass} cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all flex items-center justify-center group relative`}
-                                    title={`${day.label}: ${day.calories} kcal`}
+                                    title={`${day.label}: ${formatNumber(day.calories)} kcal`}
                                 >
                                     {/* Tooltip */}
                                     <div className="absolute bottom-full mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-                                        {day.label}: {day.calories} kcal
+                                        {day.label}: {formatNumber(day.calories)} kcal
                                     </div>
                                 </div>
                             )
@@ -691,7 +733,7 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp, on
                                     >
                                         {/* Tooltip */}
                                         <div className="absolute bottom-full mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-                                            {day.label}: {day.calories} kcal
+                                            {day.label}: {formatNumber(day.calories)} kcal
                                         </div>
 
                                         {/* Bar */}
@@ -724,7 +766,7 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp, on
                     </div>
 
                     <div className="mt-4 pt-4 border-t flex justify-between text-sm text-gray-500">
-                        <span>Avg: {stats.averages.calories} kcal/day</span>
+                        <span>Avg: {formatNumber(stats.averages.calories)} kcal/day</span>
                         <span>
                             {stats.days.filter(d => d.calories >= targetCalories * 0.9 && d.calories <= targetCalories * 1.1).length} of {stats.days.length} days on target
                         </span>
@@ -788,6 +830,7 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp, on
                     onClose={() => setSelectedMeal(null)}
                     onMealTypeChange={handleMealTypeChange}
                     onDelete={handleDeleteMeal}
+                    onDateTimeChange={handleDateTimeChange}
                 />
             )}
 

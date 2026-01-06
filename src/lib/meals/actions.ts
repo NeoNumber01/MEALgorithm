@@ -88,3 +88,29 @@ export async function updateMealType(
     revalidatePath('/dashboard')
     return { success: true }
 }
+
+export async function updateMealDateTime(
+    mealId: string,
+    newDateTime: string // ISO string
+) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+        return { error: 'Not authenticated' }
+    }
+
+    const { error } = await supabase
+        .from('meals')
+        .update({ created_at: newDateTime })
+        .eq('id', mealId)
+        .eq('user_id', user.id)
+
+    if (error) {
+        console.error('Error updating meal date/time:', error)
+        return { error: error.message }
+    }
+
+    revalidatePath('/dashboard')
+    return { success: true }
+}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { formatNumber } from '@/lib/format-utils'
 
 interface NutritionalInfo {
     calories: number
@@ -98,19 +99,19 @@ export default function DayDetailModal({ date, label, meals, totals, onClose, on
                     {/* Summary Cards */}
                     <div className="grid grid-cols-4 gap-3 mb-6">
                         <div className="bg-orange-50 p-4 rounded-2xl text-center border border-orange-100">
-                            <div className="text-2xl font-bold text-orange-600">{totals.calories}</div>
+                            <div className="text-2xl font-bold text-orange-600">{formatNumber(totals.calories)}</div>
                             <div className="text-xs text-orange-400 font-medium">Total kcal</div>
                         </div>
                         <div className="bg-red-50 p-4 rounded-2xl text-center border border-red-100">
-                            <div className="text-xl font-bold text-red-600">{totals.protein}g</div>
+                            <div className="text-xl font-bold text-red-600">{formatNumber(totals.protein)}g</div>
                             <div className="text-xs text-red-400 font-medium">Protein</div>
                         </div>
                         <div className="bg-amber-50 p-4 rounded-2xl text-center border border-amber-100">
-                            <div className="text-xl font-bold text-amber-600">{totals.carbs}g</div>
+                            <div className="text-xl font-bold text-amber-600">{formatNumber(totals.carbs)}g</div>
                             <div className="text-xs text-amber-400 font-medium">Carbs</div>
                         </div>
                         <div className="bg-blue-50 p-4 rounded-2xl text-center border border-blue-100">
-                            <div className="text-xl font-bold text-blue-600">{totals.fat}g</div>
+                            <div className="text-xl font-bold text-blue-600">{formatNumber(totals.fat)}g</div>
                             <div className="text-xs text-blue-400 font-medium">Fat</div>
                         </div>
                     </div>
@@ -126,7 +127,7 @@ export default function DayDetailModal({ date, label, meals, totals, onClose, on
                             <h3 className="font-bold text-gray-800 flex items-center gap-2">
                                 <span>🍽️</span> Meals ({meals.length})
                             </h3>
-                            {meals.map((meal) => (
+                            {[...meals].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map((meal) => (
                                 <div
                                     key={meal.id}
                                     onClick={() => onMealClick && onMealClick(meal)}
@@ -164,16 +165,16 @@ export default function DayDetailModal({ date, label, meals, totals, onClose, on
                                             {/* Nutrition Summary */}
                                             <div className="flex gap-3 text-xs">
                                                 <span className="text-orange-600 font-medium">
-                                                    {meal.analysis?.summary?.calories || 0} kcal
+                                                    {formatNumber(meal.analysis?.summary?.calories || 0)} kcal
                                                 </span>
                                                 <span className="text-red-500">
-                                                    P: {meal.analysis?.summary?.protein || 0}g
+                                                    P: {formatNumber(meal.analysis?.summary?.protein || 0)}g
                                                 </span>
                                                 <span className="text-amber-500">
-                                                    C: {meal.analysis?.summary?.carbs || 0}g
+                                                    C: {formatNumber(meal.analysis?.summary?.carbs || 0)}g
                                                 </span>
                                                 <span className="text-blue-500">
-                                                    F: {meal.analysis?.summary?.fat || 0}g
+                                                    F: {formatNumber(meal.analysis?.summary?.fat || 0)}g
                                                 </span>
                                             </div>
                                         </div>

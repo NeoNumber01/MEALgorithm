@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { getDailyStats, getUserProfile } from '@/lib/dashboard/actions'
 import { getNutritionalTargets } from '@/lib/nutrition/calculator'
-import { deleteMeal, updateMealType } from '@/lib/meals/actions'
+import { deleteMeal, updateMealType, updateMealDateTime } from '@/lib/meals/actions'
 import CalorieGauge from './CalorieGauge'
 import AICoachCard from './AICoachCard'
 import Link from 'next/link'
@@ -11,6 +11,7 @@ import MealDetailModal from './MealDetailModal'
 import StatisticsView from './StatisticsView'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { notifyDataUpdated, getLastDataUpdateTime, invalidateAIFeedbackCache, CACHE_KEYS } from '@/lib/cache-utils'
+import { formatNumber } from '@/lib/format-utils'
 
 type ViewMode = 'today' | 'week'
 
@@ -202,6 +203,27 @@ export default function DashboardContent() {
         setEditingMealId(null)
     }
 
+    const handleDateTimeChange = async (mealId: string, newDateTime: string) => {
+        const result = await updateMealDateTime(mealId, newDateTime)
+
+        if (result?.success) {
+            notifyDataUpdated()
+            // Clear cache and reload to reflect potential date change
+            localStorage.removeItem(CACHE_KEYS.DASHBOARD_TODAY)
+            localStorage.removeItem(CACHE_KEYS.DASHBOARD_TIMESTAMP)
+            invalidateAIFeedbackCache()
+
+            // Update selectedMeal if it's the one being edited
+            if (selectedMeal?.id === mealId) {
+                setSelectedMeal({ ...selectedMeal, createdAt: newDateTime })
+            }
+
+            // Reload data to reflect changes (meal might have moved to a different day)
+            await loadData()
+            setLastUpdateTimestamp(Date.now())
+        }
+    }
+
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
@@ -296,9 +318,9 @@ export default function DashboardContent() {
                                     <span className="text-sm font-medium opacity-90">Protein</span>
                                 </div>
                                 <div className="text-4xl font-bold mb-1">
-                                    {todayData?.totals?.protein || 0}g
+                                    {formatNumber(todayData?.totals?.protein || 0)}g
                                 </div>
-                                <div className="text-sm opacity-75 mb-3">of {targets.protein}g target</div>
+                                <div className="text-sm opacity-75 mb-3">of {formatNumber(targets.protein)}g target</div>
                                 <div className="bg-white/20 rounded-full h-2">
                                     <div
                                         className="bg-white rounded-full h-2 transition-all duration-500"
@@ -306,7 +328,7 @@ export default function DashboardContent() {
                                     />
                                 </div>
                                 <div className="text-xs mt-2 opacity-75">
-                                    {Math.round(((todayData?.totals?.protein || 0) / targets.protein) * 100)}% complete
+                                    {formatNumber(((todayData?.totals?.protein || 0) / targets.protein) * 100)}% complete
                                 </div>
                             </div>
                         </div>
@@ -320,9 +342,9 @@ export default function DashboardContent() {
                                     <span className="text-sm font-medium opacity-90">Carbs</span>
                                 </div>
                                 <div className="text-4xl font-bold mb-1">
-                                    {todayData?.totals?.carbs || 0}g
+                                    {formatNumber(todayData?.totals?.carbs || 0)}g
                                 </div>
-                                <div className="text-sm opacity-75 mb-3">of {targets.carbs}g target</div>
+                                <div className="text-sm opacity-75 mb-3">of {formatNumber(targets.carbs)}g target</div>
                                 <div className="bg-white/20 rounded-full h-2">
                                     <div
                                         className="bg-white rounded-full h-2 transition-all duration-500"
@@ -330,7 +352,7 @@ export default function DashboardContent() {
                                     />
                                 </div>
                                 <div className="text-xs mt-2 opacity-75">
-                                    {Math.round(((todayData?.totals?.carbs || 0) / targets.carbs) * 100)}% complete
+                                    {formatNumber(((todayData?.totals?.carbs || 0) / targets.carbs) * 100)}% complete
                                 </div>
                             </div>
                         </div>
@@ -344,9 +366,9 @@ export default function DashboardContent() {
                                     <span className="text-sm font-medium opacity-90">Fat</span>
                                 </div>
                                 <div className="text-4xl font-bold mb-1">
-                                    {todayData?.totals?.fat || 0}g
+                                    {formatNumber(todayData?.totals?.fat || 0)}g
                                 </div>
-                                <div className="text-sm opacity-75 mb-3">of {targets.fat}g target</div>
+                                <div className="text-sm opacity-75 mb-3">of {formatNumber(targets.fat)}g target</div>
                                 <div className="bg-white/20 rounded-full h-2">
                                     <div
                                         className="bg-white rounded-full h-2 transition-all duration-500"
@@ -354,7 +376,7 @@ export default function DashboardContent() {
                                     />
                                 </div>
                                 <div className="text-xs mt-2 opacity-75">
-                                    {Math.round(((todayData?.totals?.fat || 0) / targets.fat) * 100)}% complete
+                                    {formatNumber(((todayData?.totals?.fat || 0) / targets.fat) * 100)}% complete
                                 </div>
                             </div>
                         </div>
@@ -400,7 +422,7 @@ export default function DashboardContent() {
                         </Link>
                     </div>
                     <div className="space-y-3">
-                        {todayData.meals.map((meal) => (
+                        {[...todayData.meals].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map((meal) => (
                             <div
                                 key={meal.id}
                                 onClick={() => setSelectedMeal(meal)}
@@ -459,7 +481,7 @@ export default function DashboardContent() {
                                 <div className="flex items-center gap-4">
                                     <div className="text-right">
                                         <span className="font-bold text-lg text-orange-600">
-                                            {meal.analysis?.summary?.calories || 0}
+                                            {formatNumber(meal.analysis?.summary?.calories || 0)}
                                         </span>
                                         <span className="text-gray-400 text-sm ml-1">kcal</span>
                                     </div>
@@ -502,6 +524,7 @@ export default function DashboardContent() {
                     meal={selectedMeal}
                     onClose={() => setSelectedMeal(null)}
                     onMealTypeChange={handleMealTypeChange}
+                    onDateTimeChange={handleDateTimeChange}
                 />
             )}
 

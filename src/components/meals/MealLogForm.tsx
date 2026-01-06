@@ -5,6 +5,7 @@ import { analyzeMeal } from '@/lib/ai/actions'
 import { saveMeal } from '@/lib/meals/actions'
 import { MealAnalysis } from '@/lib/ai/schema'
 import { notifyDataUpdated } from '@/lib/cache-utils'
+import { formatNumber } from '@/lib/format-utils'
 
 type Step = 'input' | 'preview' | 'saving' | 'done'
 
@@ -443,13 +444,13 @@ export default function MealLogForm() {
                                             <span className="text-gray-500">({item.quantity})</span>
                                         </div>
                                         <div className="flex gap-3 mt-1 text-xs">
-                                            <span className="text-red-500 font-medium">P: {item.nutrition.protein}g</span>
-                                            <span className="text-yellow-600 font-medium">C: {item.nutrition.carbs}g</span>
-                                            <span className="text-blue-500 font-medium">F: {item.nutrition.fat}g</span>
+                                            <span className="text-red-500 font-medium">P: {formatNumber(item.nutrition.protein)}g</span>
+                                            <span className="text-yellow-600 font-medium">C: {formatNumber(item.nutrition.carbs)}g</span>
+                                            <span className="text-blue-500 font-medium">F: {formatNumber(item.nutrition.fat)}g</span>
                                         </div>
                                     </div>
                                     <span className="text-green-600 font-semibold whitespace-nowrap ml-3">
-                                        {item.nutrition.calories} kcal
+                                        {formatNumber(item.nutrition.calories)} kcal
                                     </span>
                                 </div>
                             ))}
@@ -459,25 +460,25 @@ export default function MealLogForm() {
                     <div className="grid grid-cols-4 gap-4">
                         <div className="bg-orange-100 rounded-lg p-4 text-center">
                             <div className="text-2xl font-bold text-orange-600">
-                                {analysis.summary.calories}
+                                {formatNumber(analysis.summary.calories)}
                             </div>
                             <div className="text-sm text-gray-600">Calories</div>
                         </div>
                         <div className="bg-red-100 rounded-lg p-4 text-center">
                             <div className="text-2xl font-bold text-red-600">
-                                {analysis.summary.protein}g
+                                {formatNumber(analysis.summary.protein)}g
                             </div>
                             <div className="text-sm text-gray-600">Protein</div>
                         </div>
                         <div className="bg-yellow-100 rounded-lg p-4 text-center">
                             <div className="text-2xl font-bold text-yellow-600">
-                                {analysis.summary.carbs}g
+                                {formatNumber(analysis.summary.carbs)}g
                             </div>
                             <div className="text-sm text-gray-600">Carbs</div>
                         </div>
                         <div className="bg-blue-100 rounded-lg p-4 text-center">
                             <div className="text-2xl font-bold text-blue-600">
-                                {analysis.summary.fat}g
+                                {formatNumber(analysis.summary.fat)}g
                             </div>
                             <div className="text-sm text-gray-600">Fat</div>
                         </div>

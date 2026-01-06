@@ -399,12 +399,12 @@ Deno.serve(async (req: Request) => {
             const target = userProfile.calorie_target || 2000
 
             if (ctx?.context === "today") {
-                // Meal distribution ratios (default 4 meals: 3 main + 1 snack)
+                // Meal distribution ratios (3 main meals + optional snack)
                 const MEAL_RATIOS: Record<string, number> = {
                     breakfast: 0.25,  // 25%
                     lunch: 0.30,      // 30%
                     dinner: 0.30,     // 30%
-                    snack: 0.15,      // 15%
+                    snack: 0.15,      // 15% (optional)
                 }
 
                 // Calculate proportional targets based on consumed meal types
@@ -445,7 +445,7 @@ Deno.serve(async (req: Request) => {
                 const proportionalPercentage = Math.round(proportionalRatio * 100)
 
                 prompt = `You are a friendly nutrition coach. The user has eaten ${ctx.mealCount || 0} meal(s): ${mealsEatenList}.
-Based on our meal distribution (Breakfast 25%, Lunch 30%, Dinner 30%, Snack 15%), they should have consumed about ${proportionalPercentage}% of their daily targets by now.
+Based on our meal distribution (3 main meals: Breakfast 25%, Lunch 30%, Dinner 30%, plus optional snacks), they should have consumed about ${proportionalPercentage}% of their daily targets by now.
 
 CURRENT PROGRESS vs STAGE TARGETS (based on ${proportionalPercentage}% of daily goals):
 - Calories: ${ctx.todayCalories || 0} / ${proportionalCalorieTarget} kcal (${caloriePercent}% of stage target)
