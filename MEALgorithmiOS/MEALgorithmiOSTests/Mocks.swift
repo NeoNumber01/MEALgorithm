@@ -112,6 +112,8 @@ actor MockAuthService: AuthServiceProtocol {
     var sessionToReturn: Session?
     var userToReturn: User?
     var errorToThrow: Error?
+    var reauthenticateCalled = false
+    var deleteAccountCalled = false
     
     func setSession(_ session: Session) { self.sessionToReturn = session }
     func setUser(_ user: User) { self.userToReturn = user }
@@ -153,4 +155,14 @@ actor MockAuthService: AuthServiceProtocol {
     func isAuthenticated() async -> Bool { sessionToReturn != nil }
     
     func getCurrentUser() async -> User? { userToReturn }
+    
+    func reauthenticate(email: String, password: String) async throws {
+        reauthenticateCalled = true
+        if let error = errorToThrow { throw error }
+    }
+    
+    func deleteAccount() async throws {
+        deleteAccountCalled = true
+        if let error = errorToThrow { throw error }
+    }
 }

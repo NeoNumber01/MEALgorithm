@@ -34,6 +34,8 @@ protocol AuthServiceProtocol: Actor {
     func getSession() async throws -> Session?
     func isAuthenticated() async -> Bool
     func getCurrentUser() async -> User?
+    func reauthenticate(email: String, password: String) async throws
+    func deleteAccount() async throws
 }
 
 // MARK: - Meal Service Protocol

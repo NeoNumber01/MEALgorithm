@@ -275,9 +275,19 @@ final class AuthViewModel: ObservableObject {
         isLoading = true
         
         do {
+            // 1. Clear local cache before signing out
+            CacheService.shared.clearCache()
+            
+            // 2. Notify observers to clear local SwiftData
+            NotificationCenter.default.post(name: .userWillSignOut, object: nil)
+            
+            // 3. Sign out from remote session
             try await authService.signOut()
+            
             isAuthenticated = false
             currentUserEmail = nil
+            
+            print("✅ AuthViewModel: Sign out successful, local data cleared")
         } catch {
             self.error = "Failed to sign out"
         }
@@ -288,6 +298,80 @@ final class AuthViewModel: ObservableObject {
     // MARK: - Clear Error
     func clearError() {
         error = nil
+    }
+    
+    // MARK: - Delete Account
+    /// Delete user account after password verification
+    /// - Parameter password: User's password for reauthentication
+    func deleteAccount(password: String) async {
+        guard let email = currentUserEmail else {
+            error = "Unable to verify account"
+            return
+        }
+        
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+        
+        do {
+            // Step 1: Reauthenticate with password
+            print("🔐 AuthViewModel: Reauthenticating user...")
+            try await authService.reauthenticate(email: email, password: password)
+            
+            // Step 2: Clear local data BEFORE deleting account
+            print("🧹 AuthViewModel: Clearing local data...")
+            CacheService.shared.clearCache()
+            NotificationCenter.default.post(name: .userWillSignOut, object: nil)
+            
+            // Step 3: Delete account via Edge Function
+            print("🗑️ AuthViewModel: Deleting account...")
+            try await authService.deleteAccount()
+            
+            // Step 4: Clear local state
+            isAuthenticated = false
+            currentUserEmail = nil
+            
+            print("✅ AuthViewModel: Account deleted successfully, all local data cleared")
+        } catch {
+            print("❌ AuthViewModel: Delete account failed - \(error)")
+            
+            // Provide user-friendly error messages
+            let errorMessage = error.localizedDescription
+            if errorMessage.contains("Invalid login credentials") || errorMessage.contains("invalid_credentials") {
+                self.error = "Incorrect password. Please try again."
+            } else if errorMessage.contains("timed out") {
+                self.error = "Request timed out. Please try again."
+            } else {
+                self.error = "Failed to delete account. Please try again."
+            }
+        }
+    }
+    
+    /// Delete account for OAuth users (Apple/Google) - no password required
+    func deleteAccountWithoutPassword() async {
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+        
+        do {
+            // Step 1: Clear local data BEFORE deleting account
+            print("🧹 AuthViewModel: Clearing local data...")
+            CacheService.shared.clearCache()
+            NotificationCenter.default.post(name: .userWillSignOut, object: nil)
+            
+            // Step 2: Delete account via Edge Function
+            print("🗑️ AuthViewModel: Deleting OAuth account...")
+            try await authService.deleteAccount()
+            
+            // Step 3: Clear local state
+            isAuthenticated = false
+            currentUserEmail = nil
+            
+            print("✅ AuthViewModel: OAuth account deleted successfully, all local data cleared")
+        } catch {
+            print("❌ AuthViewModel: Delete account failed - \(error)")
+            self.error = "Failed to delete account. Please try again."
+        }
     }
     
     // MARK: - Private Helpers

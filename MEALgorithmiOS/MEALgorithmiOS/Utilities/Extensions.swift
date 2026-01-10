@@ -160,4 +160,6 @@ extension Notification.Name {
     static let profileDidUpdate = Notification.Name("ProfileDidUpdate")
     static let mealDidSave = Notification.Name("MealDidSave")
     static let mealDidDelete = Notification.Name("MealDidDelete")
+    static let userWillSignOut = Notification.Name("UserWillSignOut")
 }
+

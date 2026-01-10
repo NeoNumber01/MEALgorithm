@@ -64,6 +64,42 @@ actor AuthService: AuthServiceProtocol {
         try await client.auth.signOut()
     }
     
+    // MARK: - Reauthenticate
+    /// Reauthenticate user with password before sensitive operations
+    func reauthenticate(email: String, password: String) async throws {
+        // Attempt to sign in with credentials - if successful, user is reauthenticated
+        _ = try await client.auth.signIn(email: email, password: password)
+    }
+    
+    // MARK: - Delete Account
+    /// Permanently delete user account via Edge Function
+    func deleteAccount() async throws {
+        // Get current session for authorization
+        let session = try await client.auth.session
+        
+        // Response structure from Edge Function
+        struct DeleteResponse: Decodable {
+            var success: Bool?
+            var error: String?
+        }
+        
+        // Call the delete-account Edge Function with typed response
+        let response: DeleteResponse = try await client.functions.invoke(
+            "delete-account",
+            options: FunctionInvokeOptions(
+                headers: ["Authorization": "Bearer \(session.accessToken)"]
+            )
+        )
+        
+        // Check for errors in response
+        if let errorMessage = response.error {
+            throw AuthError.deleteFailed(errorMessage)
+        }
+        
+        // Sign out locally after successful deletion
+        try? await client.auth.signOut()
+    }
+    
     // MARK: - Session
     /// Get the current session
     func getSession() async throws -> Session? {
@@ -91,6 +127,7 @@ enum AuthError: LocalizedError {
     case noSession
     case invalidCredentials
     case userNotFound
+    case deleteFailed(String)
     case unknown(Error)
     
     var errorDescription: String? {
@@ -101,6 +138,8 @@ enum AuthError: LocalizedError {
             return "Invalid email or password"
         case .userNotFound:
             return "User not found"
+        case .deleteFailed(let message):
+            return "Failed to delete account: \(message)"
         case .unknown(let error):
             return error.localizedDescription
         }

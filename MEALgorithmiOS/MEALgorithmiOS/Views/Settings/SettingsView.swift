@@ -8,6 +8,12 @@ struct SettingsView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @State private var showingSignOutConfirm = false
     
+    // Delete Account States
+    @State private var showingDeleteAccountSheet = false
+    @State private var deleteAccountPassword = ""
+    @State private var showingFinalConfirmation = false
+    @State private var isDeletingAccount = false
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -90,7 +96,7 @@ struct SettingsView: View {
                     }
                     .listRowBackground(Color.white.opacity(0.05))
                     
-                    // Sign Out Section (at the bottom)
+                    // Sign Out Section
                     Section {
                         Button(role: .destructive) {
                             showingSignOutConfirm = true
@@ -105,6 +111,25 @@ struct SettingsView: View {
                         }
                     }
                     .listRowBackground(Color.red.opacity(0.1))
+                    
+                    // Danger Zone - Delete Account
+                    Section {
+                        Button(role: .destructive) {
+                            showingDeleteAccountSheet = true
+                            HapticManager.shared.impact(style: .medium)
+                        } label: {
+                            SettingsRow(
+                                systemIcon: "trash.fill",
+                                title: "Delete Account",
+                                subtitle: "Permanently remove your account and data"
+                            )
+                        }
+                    } header: {
+                        Text("Danger Zone")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.red.opacity(0.8))
+                    }
+                    .listRowBackground(Color.red.opacity(0.05))
                 }
                 .scrollContentBackground(.hidden)
                 .listStyle(.insetGrouped)
@@ -126,6 +151,40 @@ struct SettingsView: View {
                     }
                 }
                 Button("Cancel", role: .cancel) {}
+            }
+            // Delete Account Sheet
+            .sheet(isPresented: $showingDeleteAccountSheet) {
+                DeleteAccountSheet(
+                    password: $deleteAccountPassword,
+                    isLoading: $isDeletingAccount,
+                    onConfirm: {
+                        showingFinalConfirmation = true
+                    },
+                    onCancel: {
+                        deleteAccountPassword = ""
+                        showingDeleteAccountSheet = false
+                    }
+                )
+                .environmentObject(authViewModel)
+            }
+            // Final Confirmation Alert
+            .alert("Delete Account?", isPresented: $showingFinalConfirmation) {
+                Button("Cancel", role: .cancel) {
+                    deleteAccountPassword = ""
+                }
+                Button("Delete Forever", role: .destructive) {
+                    Task {
+                        isDeletingAccount = true
+                        await authViewModel.deleteAccount(password: deleteAccountPassword)
+                        isDeletingAccount = false
+                        if authViewModel.error == nil {
+                            deleteAccountPassword = ""
+                            showingDeleteAccountSheet = false
+                        }
+                    }
+                }
+            } message: {
+                Text("This action cannot be undone. All your meals, preferences, and data will be permanently deleted.")
             }
         }
     }

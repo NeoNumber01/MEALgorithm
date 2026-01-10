@@ -105,6 +105,18 @@ actor AuthViewModelTestsMockAuthService: AuthServiceProtocol {
         return try? await getSession()?.user
     }
     
+    func reauthenticate(email: String, password: String) async throws {
+        if !shouldSucceed {
+            throw AppError.unknown("Mock reauthenticate failed")
+        }
+    }
+    
+    func deleteAccount() async throws {
+        if !shouldSucceed {
+            throw AppError.unknown("Mock delete account failed")
+        }
+    }
+    
     func setShouldSucceed(_ value: Bool) {
         self.shouldSucceed = value
     }
