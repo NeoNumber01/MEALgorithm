@@ -7,19 +7,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { classifyImage, initializeFoodClassifier } from '@/lib/classifier';
 import path from 'path';
 
+// Environment detection: Vercel sets VERCEL=1 in production
+const IS_VERCEL = process.env.VERCEL === '1';
+
 let modelWarmedUp = false;
 let warmupError: string | null = null;
 
-const warmupPromise = initializeFoodClassifier({
-    modelPath: path.join(process.cwd(), 'models', 'mobilenet_v2.onnx'),
-    debug: process.env.NODE_ENV === 'development',
-}).then(() => {
-    modelWarmedUp = true;
-    console.log('[API/classify-food] Model warmed up and ready');
-}).catch((err) => {
-    warmupError = err.message;
-    console.error('[API/classify-food] Model warmup failed:', err);
-});
+// Skip model warmup on Vercel (classifier will use fail-open mode)
+const warmupPromise = IS_VERCEL
+    ? Promise.resolve().then(() => {
+        modelWarmedUp = true;
+        console.log('[API/classify-food] Running on Vercel - classifier in fail-open mode');
+    })
+    : initializeFoodClassifier({
+        modelPath: path.join(process.cwd(), 'models', 'mobilenet_v2.onnx'),
+        debug: process.env.NODE_ENV === 'development',
+    }).then(() => {
+        modelWarmedUp = true;
+        console.log('[API/classify-food] Model warmed up and ready');
+    }).catch((err) => {
+        warmupError = err.message;
+        console.error('[API/classify-food] Model warmup failed:', err);
+    });
 
 export async function POST(request: NextRequest) {
     const startTime = performance.now();

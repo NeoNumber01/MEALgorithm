@@ -178,16 +178,41 @@ export default function MealDetailModal({ meal, onClose, onMealTypeChange, onDel
     if (!meal) return null
 
     return (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300 ${isVisible ? 'bg-black/60 backdrop-blur-sm opacity-100' : 'bg-black/0 backdrop-blur-none opacity-0 pointer-events-none'}`} onClick={handleClose}>
+        <div
+            className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isVisible ? 'modal-backdrop-enter' : 'modal-backdrop-exit pointer-events-none'}`}
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.45)' }}
+            onClick={handleClose}
+        >
             <div
-                className={`relative w-full max-w-lg bg-white/80 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/40 overflow-hidden transform transition-all duration-300 ${isVisible ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'}`}
+                className={`relative w-full max-w-lg overflow-hidden rounded-3xl ${isVisible ? 'modal-content-enter' : 'modal-content-exit'}`}
+                style={{
+                    background: 'rgba(255, 255, 255, 0.75)',
+                    backdropFilter: 'blur(24px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                    border: '1px solid rgba(255, 255, 255, 0.45)',
+                    boxShadow: `
+                        0 25px 50px -12px rgba(0, 0, 0, 0.3),
+                        0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+                        0 0 80px rgba(255, 255, 255, 0.15) inset
+                    `,
+                }}
                 onClick={(e) => e.stopPropagation()}
             >
+                {/* Gradient overlay for enhanced glass effect */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-blue-50/20 pointer-events-none rounded-3xl" />
                 {/* Delete Confirmation Overlay */}
                 {showDeleteConfirm && (
-                    <div className="absolute inset-0 z-50 bg-white/40 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
-                        <div className="bg-white/90 shadow-2xl rounded-3xl p-6 w-full max-w-sm border border-white/60 text-center transform transition-all scale-100">
-                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="absolute inset-0 z-50 flex items-center justify-center p-6 modal-backdrop-enter" style={{ background: 'rgba(255, 255, 255, 0.5)', backdropFilter: 'blur(8px)' }}>
+                        <div
+                            className="modal-content-enter w-full max-w-sm text-center p-6 rounded-3xl"
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.9)',
+                                backdropFilter: 'blur(20px)',
+                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                                border: '1px solid rgba(255, 255, 255, 0.6)',
+                            }}
+                        >
+                            <div className="w-16 h-16 bg-gradient-to-br from-red-100 via-rose-100 to-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-200/50">
                                 <span className="text-3xl">🗑️</span>
                             </div>
                             <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Meal?</h3>
@@ -197,14 +222,14 @@ export default function MealDetailModal({ meal, onClose, onMealTypeChange, onDel
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setShowDeleteConfirm(false)}
-                                    className="flex-1 py-3 px-4 rounded-xl font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                                    className="flex-1 py-3 px-4 rounded-xl font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-gray-200/50 hover:bg-white/80 transition-all shadow-sm hover:shadow-md"
                                     disabled={isUpdating}
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleConfirmDelete}
-                                    className="flex-1 py-3 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 shadow-lg shadow-red-500/30 transition-all active:scale-95"
+                                    className="flex-1 py-3 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 via-rose-500 to-red-600 hover:from-red-600 hover:via-rose-600 hover:to-red-700 shadow-lg shadow-red-500/30 hover:shadow-red-500/40 transition-all hover:-translate-y-0.5 active:scale-95"
                                     disabled={isUpdating}
                                 >
                                     {isUpdating ? 'Deleting...' : 'Delete'}
@@ -226,7 +251,7 @@ export default function MealDetailModal({ meal, onClose, onMealTypeChange, onDel
                     )}
                     <button
                         onClick={handleClose}
-                        className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/20 hover:bg-black/30 text-white flex items-center justify-center backdrop-blur-md transition-colors"
+                        className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white flex items-center justify-center transition-all duration-200 border border-white/30 hover:border-white/50 shadow-lg"
                     >
                         ✕
                     </button>
@@ -371,19 +396,19 @@ export default function MealDetailModal({ meal, onClose, onMealTypeChange, onDel
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-4 border-t border-gray-100 bg-white/50 flex justify-between items-center">
+                <div className="relative p-4 border-t border-white/30 bg-white/40 backdrop-blur-sm flex justify-between items-center">
                     {onDelete && (
                         <button
                             onClick={handleDeleteClick}
                             disabled={isUpdating}
-                            className="px-4 py-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl font-medium transition-colors flex items-center gap-2"
+                            className="px-4 py-2.5 text-red-500 hover:text-red-700 bg-white/50 hover:bg-red-50/80 backdrop-blur-sm rounded-xl font-medium transition-all duration-200 flex items-center gap-2 border border-red-200/30 hover:border-red-300/50 shadow-sm hover:shadow-md"
                         >
                             🗑️ Delete Meal
                         </button>
                     )}
                     <button
                         onClick={handleClose}
-                        className="px-6 py-2 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5 transform ml-auto"
+                        className="px-6 py-2.5 bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 text-white rounded-xl font-semibold hover:from-gray-900 hover:via-black hover:to-gray-900 transition-all duration-200 shadow-lg hover:shadow-xl hover:-translate-y-0.5 ml-auto"
                     >
                         Close
                     </button>

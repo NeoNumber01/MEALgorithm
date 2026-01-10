@@ -58,21 +58,26 @@ export default function PreferencesModal({ isOpen, onClose }: PreferencesModalPr
         <>
             {/* Backdrop with enhanced blur */}
             <div
-                className="fixed inset-0 bg-black/40 backdrop-blur-md z-50 animate-fadeIn"
+                className="fixed inset-0 z-50 modal-backdrop-enter"
+                style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }}
                 onClick={onClose}
             />
 
             {/* Modal */}
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
                 <div
-                    className="relative bg-white/60 backdrop-blur-3xl rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden pointer-events-auto animate-slideUp border border-white/50"
+                    className="relative modal-content-enter rounded-3xl w-full max-w-lg max-h-[90vh] overflow-hidden pointer-events-auto"
                     style={{
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 40px rgba(16, 185, 129, 0.15), inset 0 0 100px rgba(255, 255, 255, 0.1)'
+                        background: 'rgba(255, 255, 255, 0.88)',
+                        backdropFilter: 'blur(24px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                        border: '1px solid rgba(255, 255, 255, 0.5)',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 40px rgba(16, 185, 129, 0.15), inset 0 0 80px rgba(255, 255, 255, 0.2)'
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Glassmorphism gradient overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-emerald-50/30 pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-emerald-50/20 pointer-events-none rounded-3xl" />
 
                     {/* Header with enhanced gradient */}
                     <div className="relative bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 px-6 py-5 text-white">
@@ -188,30 +193,6 @@ export default function PreferencesModal({ isOpen, onClose }: PreferencesModalPr
                     </div>
                 </div>
             </div>
-
-            {/* CSS for animations */}
-            <style jsx>{`
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes slideUp {
-                    from { 
-                        opacity: 0;
-                        transform: translateY(20px) scale(0.95);
-                    }
-                    to { 
-                        opacity: 1;
-                        transform: translateY(0) scale(1);
-                    }
-                }
-                .animate-fadeIn {
-                    animation: fadeIn 0.2s ease-out;
-                }
-                .animate-slideUp {
-                    animation: slideUp 0.3s ease-out;
-                }
-            `}</style>
         </>
     )
 }

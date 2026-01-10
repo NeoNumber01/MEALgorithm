@@ -1,0 +1,11 @@
+# Ignore large model files for Vercel deployment
+models/
+*.onnx
+
+# Electron specific files (not needed for web deployment)
+electron/
+dist-electron/
+src-tauri/
+
+# Local development scripts
+scripts/download-model.ts

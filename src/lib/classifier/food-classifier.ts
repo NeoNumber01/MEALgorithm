@@ -3,9 +3,25 @@
  * 
  * Uses MobileNetV2 with ImageNet classes to detect food.
  * Design: < 10ms inference, zero external API calls.
+ * 
+ * NOTE: This classifier is disabled on Vercel deployments due to
+ * serverless function size limits. In that case, it returns isFood: true
+ * (fail-open behavior) to allow all images through.
  */
 
-import * as ort from 'onnxruntime-node';
+// Environment detection: Vercel sets VERCEL=1 in production
+const IS_VERCEL = process.env.VERCEL === '1';
+const CLASSIFIER_ENABLED = !IS_VERCEL;
+
+// Conditional import: only load onnxruntime-node when not on Vercel
+let ort: typeof import('onnxruntime-node') | null = null;
+if (CLASSIFIER_ENABLED) {
+    try {
+        ort = require('onnxruntime-node');
+    } catch (e) {
+        console.warn('[FoodClassifier] onnxruntime-node not available, classifier disabled');
+    }
+}
 import sharp from 'sharp';
 import path from 'path';
 import { IMAGENET_FOOD_CLASSES, getFoodClassName } from './food-classes';
@@ -55,7 +71,8 @@ const IMAGENET_STD = [0.229, 0.224, 0.225];
 
 class FoodClassifierModel {
     private static instance: FoodClassifierModel | null = null;
-    private session: ort.InferenceSession | null = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private session: any = null;
     private config: ClassifierConfig;
     private isLoading = false;
     private loadPromise: Promise<void> | null = null;
@@ -79,6 +96,14 @@ class FoodClassifierModel {
     }
 
     async loadModel(): Promise<void> {
+        // Skip model loading if ort is not available (Vercel deployment)
+        if (!ort) {
+            if (this.config.debug) {
+                console.log('[FoodClassifier] Skipping model load - onnxruntime not available (Vercel mode)');
+            }
+            return;
+        }
+
         if (this.session) return;
         if (this.isLoading && this.loadPromise) return this.loadPromise;
 
@@ -94,6 +119,8 @@ class FoodClassifierModel {
     }
 
     private async _loadModelInternal(): Promise<void> {
+        if (!ort) return;
+
         const startTime = performance.now();
 
         const sessionOptions: ort.InferenceSession.SessionOptions = {
@@ -164,8 +191,14 @@ class FoodClassifierModel {
     }
 
     async runInference(preprocessedData: Float32Array): Promise<ClassificationResult> {
-        if (!this.session) {
-            throw new Error('Model not loaded. Call loadModel() first.');
+        // Fail-open if ort is not available (Vercel deployment)
+        if (!ort || !this.session) {
+            return {
+                isFood: true,
+                confidence: 1,
+                inferenceTimeMs: 0,
+                detectedClass: 'classifier_disabled',
+            };
         }
 
         const startTime = performance.now();
@@ -176,7 +209,8 @@ class FoodClassifierModel {
         ]);
 
         const inputName = this.session.inputNames[0];
-        const feeds: Record<string, ort.Tensor> = { [inputName]: inputTensor };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const feeds: Record<string, any> = { [inputName]: inputTensor };
         const results = await this.session.run(feeds);
         const inferenceTime = performance.now() - startTime;
 

@@ -73,24 +73,39 @@ export default function DayDetailModal({ date, label, meals, totals, onClose, on
 
     return (
         <div
-            className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300 ${isVisible ? 'bg-black/60 backdrop-blur-sm opacity-100' : 'bg-black/0 backdrop-blur-none opacity-0 pointer-events-none'}`}
+            className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isVisible ? 'modal-backdrop-enter' : 'modal-backdrop-exit pointer-events-none'}`}
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.45)' }}
             onClick={handleClose}
         >
             <div
-                className={`w-full max-w-2xl max-h-[85vh] bg-white/90 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/40 overflow-hidden transform transition-all duration-300 flex flex-col ${isVisible ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'}`}
+                className={`w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-3xl flex flex-col ${isVisible ? 'modal-content-enter' : 'modal-content-exit'}`}
+                style={{
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    backdropFilter: 'blur(24px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                    border: '1px solid rgba(255, 255, 255, 0.45)',
+                    boxShadow: `
+                        0 25px 50px -12px rgba(0, 0, 0, 0.3),
+                        0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+                        0 0 80px rgba(255, 255, 255, 0.15) inset
+                    `,
+                }}
                 onClick={(e) => e.stopPropagation()}
             >
+                {/* Gradient overlay for enhanced glass effect */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-purple-50/20 pointer-events-none rounded-3xl" />
+
                 {/* Header */}
-                <div className="h-28 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 relative flex-shrink-0">
+                <div className="relative h-28 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 flex-shrink-0">
                     <button
                         onClick={handleClose}
-                        className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/20 hover:bg-black/30 text-white flex items-center justify-center backdrop-blur-md transition-colors"
+                        className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white flex items-center justify-center transition-all duration-200 border border-white/30 hover:border-white/50 shadow-lg"
                     >
                         ✕
                     </button>
                     <div className="absolute bottom-4 left-6 text-white">
                         <p className="text-sm font-medium opacity-90 uppercase tracking-widest mb-1">{label}</p>
-                        <h2 className="text-2xl font-bold">{formattedDate}</h2>
+                        <h2 className="text-2xl font-bold drop-shadow-sm">{formattedDate}</h2>
                     </div>
                 </div>
 
@@ -186,10 +201,10 @@ export default function DayDetailModal({ date, label, meals, totals, onClose, on
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-gray-100 bg-white/50 flex-shrink-0">
+                <div className="relative p-4 border-t border-white/30 bg-white/40 backdrop-blur-sm flex-shrink-0">
                     <button
                         onClick={handleClose}
-                        className="w-full px-6 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors shadow-lg"
+                        className="w-full px-6 py-3.5 bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 text-white rounded-xl font-semibold hover:from-gray-900 hover:via-black hover:to-gray-900 transition-all duration-200 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                     >
                         Close
                     </button>
