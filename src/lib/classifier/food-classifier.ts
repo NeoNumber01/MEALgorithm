@@ -9,22 +9,25 @@
  * (fail-open behavior) to allow all images through.
  */
 
+import sharp from 'sharp';
+import path from 'path';
+import { IMAGENET_FOOD_CLASSES, getFoodClassName } from './food-classes';
+
 // Environment detection: Vercel sets VERCEL=1 in production
 const IS_VERCEL = process.env.VERCEL === '1';
 const CLASSIFIER_ENABLED = !IS_VERCEL;
 
 // Conditional import: only load onnxruntime-node when not on Vercel
-let ort: typeof import('onnxruntime-node') | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let ort: any = null;
 if (CLASSIFIER_ENABLED) {
     try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         ort = require('onnxruntime-node');
     } catch (e) {
         console.warn('[FoodClassifier] onnxruntime-node not available, classifier disabled');
     }
 }
-import sharp from 'sharp';
-import path from 'path';
-import { IMAGENET_FOOD_CLASSES, getFoodClassName } from './food-classes';
 
 // ============================================================================
 // Types
@@ -123,7 +126,8 @@ class FoodClassifierModel {
 
         const startTime = performance.now();
 
-        const sessionOptions: ort.InferenceSession.SessionOptions = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sessionOptions: any = {
             executionProviders: ['cpu'],
             graphOptimizationLevel: 'all',
             enableCpuMemArena: true,
