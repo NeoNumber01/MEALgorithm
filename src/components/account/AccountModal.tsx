@@ -73,7 +73,7 @@ export default function AccountModal({ isOpen, onClose, userEmail }: AccountModa
 
         const result = await updateDisplayName(displayName)
 
-        if ('error' in result) {
+        if ('error' in result && result.error) {
             setMessage({ type: 'error', text: result.error })
         } else {
             setMessage({ type: 'success', text: 'Profile saved successfully!' })
@@ -94,7 +94,7 @@ export default function AccountModal({ isOpen, onClose, userEmail }: AccountModa
 
         const result = await updateUserEmail(newEmail)
 
-        if ('error' in result) {
+        if ('error' in result && result.error) {
             setMessage({ type: 'error', text: result.error })
         } else {
             setMessage({ type: 'success', text: 'Verification email sent! Please check your inbox and click the confirmation link.' })
@@ -115,7 +115,7 @@ export default function AccountModal({ isOpen, onClose, userEmail }: AccountModa
 
         const result = await deleteAccount()
 
-        if ('error' in result) {
+        if ('error' in result && result.error) {
             setMessage({ type: 'error', text: result.error })
             setLoading(false)
         } else {
