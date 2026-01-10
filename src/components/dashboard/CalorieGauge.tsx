@@ -14,15 +14,16 @@ export default function CalorieGauge({ current, target, label = "Today's Calorie
     const [animatedPercentage, setAnimatedPercentage] = useState(0)
 
     useEffect(() => {
-        // Simple entry animation
-        const percentage = Math.min(100, (current / target) * 100)
+        // Simple entry animation - cap at 100% for the progress bar arc
+        const arcPercentage = Math.min(100, (current / target) * 100)
         const timer = setTimeout(() => {
-            setAnimatedPercentage(percentage)
+            setAnimatedPercentage(arcPercentage)
         }, 100)
         return () => clearTimeout(timer)
     }, [current, target])
 
-    const percentage = Math.min(100, (current / target) * 100)
+    // Display percentage can exceed 100%
+    const displayPercentage = (current / target) * 100
     // SVG properties
     // SVG properties
     const radius = 80
@@ -34,10 +35,11 @@ export default function CalorieGauge({ current, target, label = "Today's Calorie
     const arcLength = Math.PI * radius // Semi-circle for now (180 deg) to keep it simple but refine the look
     // A standard semi-circle is 180 degrees. Let's stick to the semi-circle layout but make it look premium.
 
-    // Calculate color based on percentage
+    // Calculate color based on displayPercentage
+    // Red when exceeding 115% of target
     const getStatusColor = () => {
-        if (percentage > 110) return "text-red-500"
-        if (percentage > 90) return "text-lime-500" // On target
+        if (displayPercentage > 115) return "text-red-500"
+        if (displayPercentage > 90) return "text-lime-500" // On target
         return "text-cyan-600" // In progress
     }
 
@@ -118,7 +120,7 @@ export default function CalorieGauge({ current, target, label = "Today's Calorie
                             / {formatNumberLocale(target)} kcal
                         </span>
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 ${statusColorClass}`}>
-                            {Math.round(percentage)}%
+                            {Math.round(displayPercentage)}%
                         </span>
                     </div>
                 </div>
