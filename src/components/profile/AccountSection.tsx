@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import AccountModal from '../account/AccountModal'
 
 interface AccountSectionProps {
@@ -27,15 +28,13 @@ export default function AccountSection({ userEmail }: AccountSectionProps) {
                         <p className="text-gray-600 text-sm">Signed in as</p>
                         <p className="font-medium text-gray-900">{userEmail}</p>
                     </div>
-                    <form
-                        action="/auth/signout"
-                        method="post"
+                    <Link
+                        href="/auth/signout"
                         onClick={(e) => e.stopPropagation()}
+                        className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium transition"
                     >
-                        <button className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium transition">
-                            Sign Out
-                        </button>
-                    </form>
+                        Sign Out
+                    </Link>
                 </div>
             </div>
 

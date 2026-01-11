@@ -79,16 +79,17 @@ export default function Navbar({ userEmail }: { userEmail?: string | null }) {
                                     {userEmail}
                                 </button>
                             )}
-                            <form action="/auth/signout" method="post">
-                                <button className="
+                            <Link
+                                href="/auth/signout"
+                                className="
                                     text-sm font-medium text-red-600 
                                     transition-all duration-300 ease-out
                                     hover:text-red-800 hover:scale-105
                                     active:scale-95
-                                ">
-                                    Sign Out
-                                </button>
-                            </form>
+                                "
+                            >
+                                Sign Out
+                            </Link>
                         </div>
                     </div>
                 </div>
