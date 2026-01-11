@@ -71,13 +71,11 @@ export default function EmailAuthForm() {
                     router.refresh()
                 }
             } else if (mode === 'forgot') {
-                const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || location.origin}/auth/callback?next=/settings`,
-                })
+                const result = await sendPasswordResetLink(email)
 
-                if (error) {
-                    console.error('CLIENT: Reset Password Error', error)
-                    setError(error.message)
+                if (result.error) {
+                    console.error('CLIENT: Reset Password Error', result.error)
+                    setError(result.error)
                 } else {
                     setMessage('Check your email for a password reset link!')
                 }

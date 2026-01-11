@@ -102,6 +102,27 @@ export async function updateUserEmail(newEmail: string) {
 }
 
 /**
+ * Send password reset link (stateless, cross-device compatible)
+ */
+export async function sendPasswordResetLink(email: string) {
+    const supabase = createStatelessClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?next=/settings`,
+    })
+
+    if (error) {
+        console.error('SERVER ACTION sendPasswordResetLink: Error', error)
+        return { error: error.message }
+    }
+
+    return { success: true }
+}
+
+/**
  * Delete user account and all associated data
  */
 export async function deleteAccount() {
