@@ -2,16 +2,14 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "meal-algorithm",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "com.mealalgorithm.app",
   "build": {
-    "frontendDist": "../out",
-    "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "devUrl": "https://mea-lgorithm.vercel.app/"
   },
   "app": {
     "windows": [
       {
+        "url": "https://mea-lgorithm.vercel.app/",
         "title": "meal-algorithm",
         "width": 800,
         "height": 600,
@@ -21,6 +19,11 @@
     ],
     "security": {
       "csp": null
+    }
+  },
+  "plugins": {
+    "deep-linking": {
+      "customScheme": "com.mealalgorithm.app"
     }
   },
   "bundle": {

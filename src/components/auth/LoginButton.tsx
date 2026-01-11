@@ -27,10 +27,15 @@ export default function LoginButton(props: { provider: 'google' | 'github', next
     const supabase = createClient()
 
     const handleLogin = async () => {
+        const isTauri = typeof window !== 'undefined' && window.__TAURI__;
+        const redirectTo = isTauri 
+            ? 'com.mealalgorithm.app://auth/callback'
+            : `${location.origin}/auth/callback?next=${props.next || '/'}`;
+
         const { error } = await supabase.auth.signInWithOAuth({
             provider: props.provider,
             options: {
-                redirectTo: `${location.origin}/auth/callback?next=${props.next || '/'}`,
+                redirectTo,
             },
         })
         if (error) {
