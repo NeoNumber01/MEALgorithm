@@ -119,6 +119,8 @@ export default function AccountModal({ isOpen, onClose, userEmail }: AccountModa
             setMessage({ type: 'error', text: result.error })
             setLoading(false)
         } else {
+            // Clear all local storage to remove cached data (dashboard, stats, etc.)
+            localStorage.clear()
             // Redirect to login page after successful deletion
             window.location.href = '/login'
         }

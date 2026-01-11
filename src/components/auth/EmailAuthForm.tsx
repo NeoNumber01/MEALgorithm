@@ -14,12 +14,14 @@ export default function EmailAuthForm() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [message, setMessage] = useState<string | null>(null)
-    
+
     const supabase = createClient()
     const router = useRouter()
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        e.preventDefault()
+        console.log('CLIENT: Form submitted', { mode, email })
         setError(null)
         setMessage(null)
         setLoading(true)
@@ -44,7 +46,7 @@ export default function EmailAuthForm() {
                     email,
                     password,
                     options: {
-                        emailRedirectTo: `${location.origin}/auth/callback`,
+                        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`,
                     },
                 })
 
@@ -61,6 +63,7 @@ export default function EmailAuthForm() {
                 })
 
                 if (error) {
+                    console.error('CLIENT: SignIn Error', error)
                     setError(error.message)
                 } else {
                     router.push('/dashboard')
@@ -68,16 +71,18 @@ export default function EmailAuthForm() {
                 }
             } else if (mode === 'forgot') {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                    redirectTo: `${location.origin}/auth/callback?next=/settings`,
+                    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || location.origin}/auth/callback?next=/settings`,
                 })
 
                 if (error) {
+                    console.error('CLIENT: Reset Password Error', error)
                     setError(error.message)
                 } else {
                     setMessage('Check your email for a password reset link!')
                 }
             }
         } catch (err) {
+            console.error('CLIENT: Unexpected Error', err)
             setError('An unexpected error occurred')
             console.error(err)
         } finally {

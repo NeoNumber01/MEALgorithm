@@ -11,17 +11,20 @@ export async function getUserDisplayInfo() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) return { error: 'Not authenticated' }
+    if (!user) {
+        console.error('SERVER ACTION getUserDisplayInfo: Not authenticated')
+        return { error: 'Not authenticated' }
+    }
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('display_name')
+        .select('full_name')
         .eq('id', user.id)
         .single()
 
     return {
         email: user.email,
-        displayName: profile?.display_name || user.user_metadata?.full_name || '',
+        displayName: profile?.full_name || user.user_metadata?.full_name || '',
     }
 }
 
@@ -32,7 +35,10 @@ export async function updateDisplayName(displayName: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) return { error: 'Not authenticated' }
+    if (!user) {
+        console.error('SERVER ACTION updateDisplayName: Not authenticated')
+        return { error: 'Not authenticated' }
+    }
 
     // Validate display name
     if (displayName.length > 100) {
@@ -43,11 +49,12 @@ export async function updateDisplayName(displayName: string) {
         .from('profiles')
         .upsert({
             id: user.id,
-            display_name: displayName.trim(),
+            full_name: displayName.trim(),
             updated_at: new Date().toISOString(),
         })
 
     if (error) {
+        console.error('SERVER ACTION updateDisplayName: DB Error', error)
         return { error: error.message }
     }
 
@@ -63,7 +70,10 @@ export async function updateUserEmail(newEmail: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) return { error: 'Not authenticated' }
+    if (!user) {
+        console.error('SERVER ACTION updateUserEmail: Not authenticated')
+        return { error: 'Not authenticated' }
+    }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -77,11 +87,15 @@ export async function updateUserEmail(newEmail: string) {
 
     const { error } = await supabase.auth.updateUser({
         email: newEmail,
+    }, {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/settings`,
     })
 
     if (error) {
+        console.error('SERVER ACTION updateUserEmail: Auth Update Error', error)
         return { error: error.message }
     }
+    console.log('SERVER ACTION updateUserEmail: Success for', newEmail)
 
     return { success: true }
 }
@@ -93,19 +107,23 @@ export async function deleteAccount() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) return { error: 'Not authenticated' }
+    if (!user) {
+        console.error('SERVER ACTION deleteAccount: Not authenticated')
+        return { error: 'Not authenticated' }
+    }
 
     try {
         // Delete user's meal logs
         const { error: mealLogsError } = await supabase
-            .from('meal_logs')
+            .from('meals')
             .delete()
             .eq('user_id', user.id)
 
         if (mealLogsError) {
-            console.error('Error deleting meal logs:', mealLogsError)
-            // Continue anyway - we'll try to delete the profile and user
+            console.error('SERVER ACTION: Error deleting meal logs:', mealLogsError)
+            return { error: 'Failed to delete meal logs: ' + mealLogsError.message }
         }
+        console.log('SERVER ACTION: Meal logs deleted successfully')
 
         // Delete user's profile
         const { error: profileError } = await supabase
@@ -114,9 +132,10 @@ export async function deleteAccount() {
             .eq('id', user.id)
 
         if (profileError) {
-            console.error('Error deleting profile:', profileError)
-            // Continue anyway
+            console.error('SERVER ACTION: Error deleting profile:', profileError)
+            return { error: 'Failed to delete profile: ' + profileError.message }
         }
+        console.log('SERVER ACTION: Profile deleted successfully')
 
         // Sign out the user first
         await supabase.auth.signOut()
@@ -124,7 +143,10 @@ export async function deleteAccount() {
         // Note: To fully delete the auth user, we need to use the admin API
         // This requires a server-side API route with service role key
         // For now, we'll call the delete API route
-        const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/account/delete`, {
+        const apiUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/account/delete`
+        console.log('SERVER ACTION deleteAccount: Calling API', apiUrl)
+
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
