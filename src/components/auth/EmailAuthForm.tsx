@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { sendPasswordResetLink } from '@/lib/profile/account-actions'
 import { useRouter } from 'next/navigation'
 
 type AuthMode = 'login' | 'register' | 'forgot'
