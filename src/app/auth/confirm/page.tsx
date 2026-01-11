@@ -8,7 +8,7 @@ import { Suspense } from 'react'
 function ConfirmContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
+    const [status, setStatus] = useState<'processing' | 'success' | 'error' | 'email-changed'>('processing')
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const supabase = createClient()
 
@@ -59,6 +59,14 @@ function ConfirmContent() {
                 return
             }
 
+            // Special case: Email change confirmation
+            // When changing email, Supabase updates the email and redirects without session tokens
+            // If we came from /settings, assume this was an email change and show success
+            if (next === '/settings') {
+                setStatus('email-changed')
+                return
+            }
+
             // No auth info found
             setStatus('error')
             setErrorMessage('No authentication information found. Please try again.')
@@ -73,6 +81,30 @@ function ConfirmContent() {
                 <div className="text-center">
                     <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                     <p className="text-gray-600">Verifying your identity...</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (status === 'email-changed') {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-blue-50 px-4">
+                <div className="max-w-md w-full bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-8 text-center border border-white/40">
+                    <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Email Updated!</h2>
+                    <p className="text-gray-600 mb-6">
+                        Your email address has been successfully changed. Please log in with your new email.
+                    </p>
+                    <button
+                        onClick={() => router.push('/login')}
+                        className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl font-medium hover:from-green-700 hover:to-blue-700 transition-all shadow-lg"
+                    >
+                        Go to Login
+                    </button>
                 </div>
             </div>
         )
