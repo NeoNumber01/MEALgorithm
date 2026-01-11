@@ -66,6 +66,7 @@ export async function updateDisplayName(displayName: string) {
 
 /**
  * Update user email - sends verification email to new address
+ * Uses stateless client for cross-device confirmation support
  */
 export async function updateUserEmail(newEmail: string) {
     const supabase = await createClient()
@@ -86,10 +87,22 @@ export async function updateUserEmail(newEmail: string) {
         return { error: 'New email is the same as current email' }
     }
 
-    const { error } = await supabase.auth.updateUser({
+    // Use stateless client for cross-device email confirmation
+    const statelessSupabase = createStatelessClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
+    // Set the session on the stateless client
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+        await statelessSupabase.auth.setSession(session)
+    }
+
+    const { error } = await statelessSupabase.auth.updateUser({
         email: newEmail,
     }, {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/settings`,
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?next=/settings`,
     })
 
     if (error) {
