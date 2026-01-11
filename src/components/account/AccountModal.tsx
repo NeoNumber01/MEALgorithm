@@ -283,6 +283,32 @@ export default function AccountModal({ isOpen, onClose, userEmail }: AccountModa
                                         {loading ? 'Sending...' : 'Send Verification Email'}
                                     </button>
                                 </div>
+
+                                {/* Change Password Section */}
+                                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                                    <h3 className="font-medium text-purple-900 mb-2">🔑 Change Password</h3>
+                                    <p className="text-sm text-purple-700 mb-4">
+                                        Reset your password by receiving a secure link via email.
+                                    </p>
+                                    <button
+                                        onClick={async () => {
+                                            setLoading(true)
+                                            setMessage(null)
+                                            const { sendPasswordResetLink } = await import('@/lib/profile/account-actions')
+                                            const result = await sendPasswordResetLink(userEmail)
+                                            if (result.error) {
+                                                setMessage({ type: 'error', text: result.error })
+                                            } else {
+                                                setMessage({ type: 'success', text: 'Password reset email sent! Check your inbox.' })
+                                            }
+                                            setLoading(false)
+                                        }}
+                                        disabled={loading}
+                                        className="w-full py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        {loading ? 'Sending...' : 'Send Password Reset Email'}
+                                    </button>
+                                </div>
                             </div>
                         )}
 

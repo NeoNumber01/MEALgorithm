@@ -21,7 +21,6 @@ export default function EmailAuthForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        e.preventDefault()
         console.log('CLIENT: Form submitted', { mode, email })
         setError(null)
         setMessage(null)
