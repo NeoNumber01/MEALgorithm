@@ -17,6 +17,7 @@ export async function GET(request: Request) {
         }
     }
 
-    // return the user to an error page with instructions
-    return NextResponse.redirect(`${origin}/auth/auth-code-error?error=NoCodeProvided`)
+    // For email-based auth (recovery, magic link), hash fragments are handled client-side
+    // Redirect to client-side handler page
+    return NextResponse.redirect(`${origin}/auth/confirm?next=${encodeURIComponent(next)}`)
 }
