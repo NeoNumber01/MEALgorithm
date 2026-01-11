@@ -42,16 +42,11 @@ export default function EmailAuthForm() {
                     return
                 }
 
-                const { error } = await supabase.auth.signUp({
-                    email,
-                    password,
-                    options: {
-                        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`,
-                    },
-                })
+                const { signUpWithEmail } = await import('@/lib/profile/account-actions')
+                const result = await signUpWithEmail(email, password)
 
-                if (error) {
-                    setError(error.message)
+                if (result.error) {
+                    setError(result.error)
                 } else {
                     setMessage('Check your email for a confirmation link!')
                     setMode('login')

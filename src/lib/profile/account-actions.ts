@@ -123,6 +123,36 @@ export async function sendPasswordResetLink(email: string) {
 }
 
 /**
+ * Sign up with email (stateless, cross-device compatible)
+ */
+export async function signUpWithEmail(email: string, password: string) {
+    const supabase = createStatelessClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
+    const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+            emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+        },
+    })
+
+    if (error) {
+        console.error('SERVER ACTION signUpWithEmail: Error', error)
+        return { error: error.message }
+    }
+
+    // Check if user already exists (Supabase returns user with identities=[] for existing users)
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+        return { error: 'An account with this email already exists.' }
+    }
+
+    return { success: true }
+}
+
+/**
  * Delete user account and all associated data
  */
 export async function deleteAccount() {
