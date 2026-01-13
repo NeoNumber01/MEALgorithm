@@ -114,3 +114,48 @@ export async function updateMealDateTime(
     revalidatePath('/dashboard')
     return { success: true }
 }
+
+// Return the most frequently logged meals for the current user
+export async function getFrequentMeals(limit = 5) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+        return { error: 'Not authenticated' }
+    }
+
+    // Fetch recent meals (bounded) and compute frequencies in memory
+    const { data, error } = await supabase
+        .from('meals')
+        .select('text_content, meal_type')
+        .eq('user_id', user.id)
+        .not('text_content', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(200) // safety cap
+
+    if (error) {
+        console.error('Error fetching frequent meals:', error)
+        return { error: error.message }
+    }
+
+    const freqMap = new Map<string, { textContent: string; mealType: string | null; count: number }>()
+    for (const row of data || []) {
+        const key = `${row.text_content}::${row.meal_type || 'any'}`
+        if (!freqMap.has(key)) {
+            freqMap.set(key, { textContent: row.text_content as string, mealType: row.meal_type, count: 0 })
+        }
+        const entry = freqMap.get(key)!
+        entry.count += 1
+    }
+
+    const meals = Array.from(freqMap.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit)
+        .map((m) => ({
+            textContent: m.textContent,
+            mealType: m.mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | null,
+            count: m.count,
+        }))
+
+    return { meals }
+}

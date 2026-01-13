@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { analyzeMeal } from '@/lib/ai/actions'
 import { saveMeal } from '@/lib/meals/actions'
 import { MealAnalysis } from '@/lib/ai/schema'
@@ -8,6 +8,12 @@ import { notifyDataUpdated } from '@/lib/cache-utils'
 import { formatNumber } from '@/lib/format-utils'
 
 type Step = 'input' | 'preview' | 'saving' | 'done'
+
+type FrequentMeal = {
+    textContent: string
+    mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null
+    count: number
+}
 
 export default function MealLogForm() {
     const [step, setStep] = useState<Step>('input')
@@ -19,6 +25,8 @@ export default function MealLogForm() {
     const [analysis, setAnalysis] = useState<MealAnalysis | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('lunch')
+    const [frequentMeals, setFrequentMeals] = useState<FrequentMeal[]>([])
+    const [loadingFrequent, setLoadingFrequent] = useState(false)
 
     // Food detection states
     const [isCheckingFood, setIsCheckingFood] = useState(false)
@@ -29,6 +37,25 @@ export default function MealLogForm() {
     const now = new Date()
     const [date, setDate] = useState(now.toLocaleDateString('en-CA')) // YYYY-MM-DD local
     const [time, setTime] = useState(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`)
+
+    // Fetch frequently logged meals for quick-add
+    useEffect(() => {
+        const fetchFrequent = async () => {
+            setLoadingFrequent(true)
+            try {
+                const res = await fetch('/api/meals/frequent')
+                if (!res.ok) throw new Error('Failed to load frequent meals')
+                const data = await res.json()
+                setFrequentMeals(data.meals || [])
+            } catch (err) {
+                console.warn('Frequent meals fetch error:', err)
+            } finally {
+                setLoadingFrequent(false)
+            }
+        }
+
+        fetchFrequent()
+    }, [])
 
     const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -299,6 +326,48 @@ export default function MealLogForm() {
                                 <p className="text-xs text-gray-500 mt-2">
                                     💡 Tip: Mention portion sizes, what you didn&apos;t eat, or any modifications for more accurate analysis.
                                 </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 'input' && (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <span>⚡ Quick add</span>
+                                {loadingFrequent && <span className="text-xs text-gray-500">Loading...</span>}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {frequentMeals.length === 0 && !loadingFrequent && (
+                                    <span className="text-xs text-gray-500">No frequent meals yet</span>
+                                )}
+                                {frequentMeals.map((meal) => {
+                                    const icon = meal.mealType === 'breakfast'
+                                        ? '🌅'
+                                        : meal.mealType === 'lunch'
+                                            ? '☀️'
+                                            : meal.mealType === 'dinner'
+                                                ? '🌙'
+                                                : '🍿'
+                                    return (
+                                        <button
+                                            key={`${meal.textContent}-${meal.mealType || 'any'}`}
+                                            onClick={() => {
+                                                setInputMode('text')
+                                                setTextInput(meal.textContent)
+                                                if (meal.mealType) setMealType(meal.mealType)
+                                                setError(null)
+                                                setAnalysis(null)
+                                            }}
+                                            className="px-3 py-2 rounded-lg border border-gray-200 bg-white/80 hover:bg-white shadow-sm text-left text-sm transition"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <span>{icon}</span>
+                                                <span className="font-medium truncate max-w-[200px]">{meal.textContent}</span>
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-1">Logged {meal.count}×</div>
+                                        </button>
+                                    )
+                                })}
                             </div>
                         </div>
                     )}
