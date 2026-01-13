@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import MealLogForm from '@/components/meals/MealLogForm'
 import MealCalendar from '@/components/meals/MealCalendar'
+import QuickAddMeals from '@/components/meals/QuickAddMeals'
 
 export default async function LogMealPage() {
     const supabase = await createClient()
@@ -47,8 +48,11 @@ export default async function LogMealPage() {
 
                 {/* Two Column Layout */}
                 <div className="mt-8 grid lg:grid-cols-3 gap-6">
-                    {/* Left: Tips Section */}
+                    {/* Left: Tips & Quick Add Section */}
                     <div className="lg:col-span-1 space-y-4">
+                        {/* Quick Add Meals */}
+                        <QuickAddMeals />
+
                         <div className="bg-white/15 backdrop-blur-xl rounded-xl p-4 border border-white/20 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:bg-white/20">
                             <div className="text-2xl mb-2">📷</div>
                             <h3 className="font-semibold text-gray-900 mb-1">Photo Tips</h3>

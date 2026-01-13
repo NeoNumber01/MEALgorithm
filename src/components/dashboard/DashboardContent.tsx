@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react'
 import { getDailyStats, getUserProfile } from '@/lib/dashboard/actions'
 import { getNutritionalTargets } from '@/lib/nutrition/calculator'
 import { deleteMeal, updateMealType, updateMealDateTime } from '@/lib/meals/actions'
+import { logWaterIntake, getDailyWaterIntake } from '@/lib/water/actions'
 import CalorieGauge from './CalorieGauge'
 import AICoachCard from './AICoachCard'
+import WaterIntakeTracker from './WaterIntakeTracker'
 import Link from 'next/link'
 import MealDetailModal from './MealDetailModal'
 import StatisticsView from './StatisticsView'
@@ -42,6 +44,7 @@ export default function DashboardContent() {
     const [mealToDelete, setMealToDelete] = useState<string | null>(null)
     const [editingMealId, setEditingMealId] = useState<string | null>(null)
     const [goal, setGoal] = useState<'maintenance' | 'weight-loss' | 'muscle-gain' | undefined>()
+    const [waterIntake, setWaterIntake] = useState(0)
 
     const [lastUpdateTimestamp, setLastUpdateTimestamp] = useState<number>(() => {
         if (typeof window !== 'undefined') return getLastDataUpdateTime()
@@ -130,7 +133,11 @@ export default function DashboardContent() {
             localStorage.setItem(CACHE_KEYS.DASHBOARD_TARGETS, JSON.stringify(calculatedTargets))
         }
 
-
+        // Load water intake
+        const waterResult = await getDailyWaterIntake()
+        if (!('error' in waterResult)) {
+            setWaterIntake(waterResult.totalIntake)
+        }
 
         setLoading(false)
     }
@@ -298,12 +305,28 @@ export default function DashboardContent() {
             {/* Today View Content */}
             {viewMode === 'today' && (
                 <>
-                    {/* Calorie Gauge Card */}
-                    <div className="bg-white/15 backdrop-blur-3xl rounded-3xl border border-white/20 shadow-2xl p-8 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:bg-white/20">
-                        <CalorieGauge
-                            current={todayData?.totals?.calories || 0}
-                            target={targets.calories}
-                            label="Today's Calories"
+                    {/* Top Row: Calorie Gauge & Water Intake */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Calorie Gauge Card */}
+                        <div className="bg-white/15 backdrop-blur-3xl rounded-3xl border border-white/20 shadow-2xl p-8 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:bg-white/20">
+                            <CalorieGauge
+                                current={todayData?.totals?.calories || 0}
+                                target={targets.calories}
+                                label="Today's Calories"
+                            />
+                        </div>
+
+                        {/* Water Intake Tracker */}
+                        <WaterIntakeTracker
+                            currentIntake={waterIntake}
+                            target={2000}
+                            onWaterLogged={() => {
+                                getDailyWaterIntake().then(result => {
+                                    if (!('error' in result)) {
+                                        setWaterIntake(result.totalIntake)
+                                    }
+                                })
+                            }}
                         />
                     </div>
 
