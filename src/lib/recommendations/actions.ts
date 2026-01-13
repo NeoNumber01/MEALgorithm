@@ -123,7 +123,7 @@ export async function getRecommendations(forceRefresh = false): Promise<Recommen
 
             // Check if the cached goal matches current profile goal
             const cachedGoal = cached.context?.goal
-            const currentGoal = profile.goal_description || 'General health'
+            const currentGoal = profile.goal === 'weight-loss' ? 'Weight Loss' : profile.goal === 'muscle-gain' ? 'Muscle Gain' : 'Maintenance'
             const goalsMatch = cachedGoal === currentGoal
 
             // Use cache if all conditions are met
@@ -225,7 +225,7 @@ IMPORTANT: Pay close attention to the user's food preferences and restrictions!
 
 User Profile:
 - Calorie Target: ${profile?.calorie_target || 2000} kcal/day
-- Goal: ${profile?.goal_description || 'General health'}
+- Goal: ${currentGoal}
 
 ${preferencesSection.length > 0 ? `User Preferences:\n${preferencesSection.join('\n')}` : ''}
 
@@ -311,7 +311,7 @@ Provide exactly 3 recommendations in this JSON format:
             context: {
                 targetCalories: profile?.calorie_target || 2000,
                 recentAvgCalories: avgCalories,
-                goal: profile?.goal_description,
+                goal: profile?.goal,
             }
         }
     } catch (e) {
@@ -448,7 +448,7 @@ You are a professional nutritionist AI. Create a meal plan for the remaining mea
 
 User Profile:
 - Daily Calorie Target: ${targetCalories} kcal
-- Goal: ${profile?.goal_description || 'General health'}
+- Goal: ${profile?.goal === 'weight-loss' ? 'Weight Loss' : profile?.goal === 'muscle-gain' ? 'Muscle Gain' : 'Maintenance'}
 
 Today's Progress:
 - Calories consumed so far: ${consumedCalories} kcal

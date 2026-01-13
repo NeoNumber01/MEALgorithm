@@ -13,7 +13,7 @@ export interface Database {
                 Row: {
                     id: string
                     calorie_target: number
-                    goal_description: string | null
+                    goal: 'maintenance' | 'weight-loss' | 'muscle-gain' | null
                     full_name: string | null
                     avatar_url: string | null
                     updated_at: string | null
@@ -21,7 +21,7 @@ export interface Database {
                 Insert: {
                     id: string
                     calorie_target?: number
-                    goal_description?: string | null
+                    goal?: 'maintenance' | 'weight-loss' | 'muscle-gain' | null
                     full_name?: string | null
                     avatar_url?: string | null
                     updated_at?: string | null
@@ -29,7 +29,7 @@ export interface Database {
                 Update: {
                     id?: string
                     calorie_target?: number
-                    goal_description?: string | null
+                    goal?: 'maintenance' | 'weight-loss' | 'muscle-gain' | null
                     full_name?: string | null
                     avatar_url?: string | null
                     updated_at?: string | null

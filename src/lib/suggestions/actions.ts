@@ -102,7 +102,7 @@ export async function getNextMeal(forceRefresh = false): Promise<NextMealResult 
                 recommendations: cached.recommendations,
                 context: {
                     ...calorieData,
-                    goal: profile?.goal_description,
+                    goal: profile?.goal || 'maintenance',
                 }
             }
         }

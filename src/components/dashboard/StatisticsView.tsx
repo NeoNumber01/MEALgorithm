@@ -63,7 +63,7 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp, on
     const [dayLoading, setDayLoading] = useState(false)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedMeal, setSelectedMeal] = useState<any>(null)
-    const [goalDescription, setGoalDescription] = useState<string | undefined>()
+    const [goal, setGoal] = useState<'maintenance' | 'weight-loss' | 'muscle-gain' | undefined>()
 
     const timeRangeOptions: { value: TimeRange; label: string; days?: number }[] = [
         { value: '3d', label: '3 Days', days: 3 },
@@ -169,7 +169,7 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp, on
 
         // Save goal description from profile
         if (!('error' in profileResult) && profileResult.profile) {
-            setGoalDescription(profileResult.profile.goal_description || undefined)
+            setGoal(profileResult.profile.goal || undefined)
         }
         setLoading(false)
     }
@@ -553,7 +553,7 @@ export default function StatisticsView({ targetCalories, lastUpdateTimestamp, on
                 <AICoachCard
                     context="statistics"
                     targetCalories={targetCalories}
-                    goalDescription={goalDescription}
+                    goal={goal}
                     statsData={{
                         avgCalories: stats.averages.calories,
                         avgProtein: stats.averages.protein,

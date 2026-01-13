@@ -13,7 +13,7 @@ export default async function Home() {
   // Get some quick stats for the user
   const { data: profile } = await supabase
     .from('profiles')
-    .select('calorie_target, goal_description')
+    .select('calorie_target, goal')
     .eq('id', user.id)
     .single()
 
@@ -108,7 +108,7 @@ export default async function Home() {
           <div className="text-center p-4">
             <div className="text-4xl mb-2">💪</div>
             <div className="text-xl font-bold text-gray-900 truncate">
-              {profile?.goal_description || 'Set your goal'}
+              {profile?.goal === 'weight-loss' ? '📉 Losing Weight' : profile?.goal === 'muscle-gain' ? '💪 Building Muscle' : '⚖️ Maintaining Weight'}
             </div>
             <div className="text-sm text-gray-500">Current Goal</div>
           </div>

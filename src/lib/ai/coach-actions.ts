@@ -16,7 +16,7 @@ export interface CoachAdviceParams {
         targetFat: number
     }
     targetCalories: number
-    goalDescription?: string
+    goal?: 'maintenance' | 'weight-loss' | 'muscle-gain'
     statsData?: {
         avgCalories: number
         avgProtein: number

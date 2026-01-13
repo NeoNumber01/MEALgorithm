@@ -29,7 +29,7 @@ export async function updateProfile(data: {
     age?: number
     gender?: Gender
     activity_level?: ActivityLevel
-    goal_description?: string
+    goal?: 'maintenance' | 'weight-loss' | 'muscle-gain'
     calorie_target?: number
     protein_target?: number
     carbs_target?: number

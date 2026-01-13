@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
 
 User Profile:
 - Calorie Target: ${profile?.calorie_target || 2000} kcal/day
-- Goal: ${profile?.goal_description || 'General health'}
+- Goal: ${profile?.goal === 'weight-loss' ? 'Weight Loss' : profile?.goal === 'muscle-gain' ? 'Muscle Gain' : 'Maintenance'}
 
 ${preferencesSection.length > 0 ? `Preferences:\n${preferencesSection.join('\n')}` : ''}
 ${frequentIngredients.length > 0 ? `User enjoys: ${frequentIngredients.join(', ')}` : ''}
@@ -165,7 +165,7 @@ Respond in JSON format:
             context: {
                 targetCalories: profile?.calorie_target || 2000,
                 recentAvgCalories: avgCalories,
-                goal: profile?.goal_description,
+                goal: profile?.goal,
             }
         }
 

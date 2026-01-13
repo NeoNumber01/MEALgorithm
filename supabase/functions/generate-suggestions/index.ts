@@ -49,7 +49,7 @@ interface SuggestionsRequest {
 
 interface UserProfile {
     calorie_target?: number
-    goal_description?: string
+    goal?: 'maintenance' | 'weight-loss' | 'muscle-gain'
     food_preferences?: string
     food_dislikes?: string
     dietary_restrictions?: string
@@ -72,7 +72,7 @@ Variation seed: ${Date.now()}-${Math.random().toString(36).substring(7)}
 
 User Profile:
 - Calorie Target: ${profile.calorie_target || 2000} kcal/day
-- Goal: ${profile.goal_description || 'General health'}
+- Goal: ${profile.goal === 'weight-loss' ? 'Weight Loss' : profile.goal === 'muscle-gain' ? 'Muscle Gain' : 'Maintenance'}
 ${profile.food_preferences ? `- Favorite Foods (PRIORITIZE THESE): ${profile.food_preferences}` : ''}
 ${profile.food_dislikes ? `- Foods to AVOID (DO NOT SUGGEST): ${profile.food_dislikes}` : ''}
 ${profile.dietary_restrictions ? `- Dietary Restrictions (MUST RESPECT): ${profile.dietary_restrictions}` : ''}
@@ -208,7 +208,7 @@ Random variation seed: ${Date.now()}-${Math.random().toString(36).substring(7)}
 
 User Profile:
 - Daily Calorie Target: ${profile.calorie_target || 2000} kcal
-- Goal: ${profile.goal_description || 'General health'}
+- Goal: ${profile.goal === 'weight-loss' ? 'Weight Loss' : profile.goal === 'muscle-gain' ? 'Muscle Gain' : 'Maintenance'}
 ${profile.food_preferences ? `- Favorite Foods (PRIORITIZE THESE): ${profile.food_preferences}` : ''}
 ${profile.food_dislikes ? `- Foods to AVOID (DO NOT SUGGEST): ${profile.food_dislikes}` : ''}
 ${profile.dietary_restrictions ? `- Dietary Restrictions (MUST RESPECT): ${profile.dietary_restrictions}` : ''}
@@ -454,7 +454,7 @@ CURRENT PROGRESS vs STAGE TARGETS (based on ${proportionalPercentage}% of daily 
 - Fat: ${ctx.todayFat || 0}g / ${proportionalFatTarget}g (${fatPercent}%)
 
 Full Day Targets: ${target} kcal, ${proteinTarget}g protein, ${carbsTarget}g carbs, ${fatTarget}g fat
-Goal: ${userProfile.goal_description || 'General health'}
+Goal: ${userProfile.goal === 'weight-loss' ? 'Weight Loss' : userProfile.goal === 'muscle-gain' ? 'Muscle Gain' : 'Maintenance'}
 
 Rules:
 - Start with a relevant emoji (🎯🔥💪🥗✨📈)
@@ -493,7 +493,7 @@ MEAL TRACKING:
 
 CONSISTENCY: ${ctx?.consistencyScore || 0}% of days within ±10% of calorie target
 
-GOAL: ${userProfile.goal_description || 'General health'}
+GOAL: ${userProfile.goal === 'weight-loss' ? 'Weight Loss' : userProfile.goal === 'muscle-gain' ? 'Muscle Gain' : 'Maintenance'}
 
 Rules:
 - Start with a relevant emoji (📊📈💪🎯✨)

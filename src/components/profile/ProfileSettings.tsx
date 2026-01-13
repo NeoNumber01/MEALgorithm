@@ -5,6 +5,8 @@ import { getProfile, updateProfile } from '@/lib/profile/actions'
 import { calculateTDEE, calculateMacroTargets, Gender, ActivityLevel } from '@/lib/nutrition/calculator'
 import { notifyGoalUpdated, notifyDataUpdated } from '@/lib/cache-utils'
 
+type Goal = 'maintenance' | 'weight-loss' | 'muscle-gain'
+
 export default function ProfileSettings() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -16,7 +18,8 @@ export default function ProfileSettings() {
     const [age, setAge] = useState<number | ''>('')
     const [gender, setGender] = useState<Gender>('male')
     const [activityLevel, setActivityLevel] = useState<ActivityLevel>('moderate')
-    const [goalDescription, setGoalDescription] = useState('')
+    const [goal, setGoal] = useState<Goal>('maintenance')
+    const [showBodyCompositionWarning, setShowBodyCompositionWarning] = useState(false)
 
     // Calculated/Custom targets
     const [calorieTarget, setCalorieTarget] = useState(2000)
@@ -30,16 +33,27 @@ export default function ProfileSettings() {
     }, [])
 
     useEffect(() => {
-        // Recalculate when stats change
+        // Recalculate when stats or goal changes
         if (!useCustomTargets && heightCm && weightKg && age) {
-            const tdee = calculateTDEE(Number(weightKg), Number(heightCm), Number(age), gender, activityLevel)
+            let tdee = calculateTDEE(Number(weightKg), Number(heightCm), Number(age), gender, activityLevel)
+            
+            // Adjust TDEE based on goal
+            if (goal === 'weight-loss') {
+                // 15% deficit for sustainable weight loss
+                tdee = Math.round(tdee * 0.85)
+            } else if (goal === 'muscle-gain') {
+                // 15% surplus for lean bulk (moderate surplus for general lifters)
+                tdee = Math.round(tdee * 1.15)
+            }
+            // For maintenance, use TDEE as-is
+            
             const macros = calculateMacroTargets(tdee)
             setCalorieTarget(tdee)
             setProteinTarget(macros.protein)
             setCarbsTarget(macros.carbs)
             setFatTarget(macros.fat)
         }
-    }, [heightCm, weightKg, age, gender, activityLevel, useCustomTargets])
+    }, [heightCm, weightKg, age, gender, activityLevel, useCustomTargets, goal])
 
     const loadProfile = async () => {
         setLoading(true)
@@ -52,7 +66,13 @@ export default function ProfileSettings() {
             if (p.age) setAge(p.age)
             if (p.gender) setGender(p.gender)
             if (p.activity_level) setActivityLevel(p.activity_level)
-            if (p.goal_description) setGoalDescription(p.goal_description)
+            // Parse goal from profile or default to maintenance
+            if (p.goal) {
+                const goalValue = p.goal as Goal
+                if (['maintenance', 'weight-loss', 'muscle-gain'].includes(goalValue)) {
+                    setGoal(goalValue)
+                }
+            }
             if (p.calorie_target) setCalorieTarget(p.calorie_target)
             if (p.protein_target) setProteinTarget(p.protein_target)
             if (p.carbs_target) setCarbsTarget(p.carbs_target)
@@ -72,7 +92,7 @@ export default function ProfileSettings() {
             age: age ? Number(age) : undefined,
             gender,
             activity_level: activityLevel,
-            goal_description: goalDescription,
+            goal,
             calorie_target: calorieTarget,
             protein_target: proteinTarget,
             carbs_target: carbsTarget,
@@ -181,14 +201,28 @@ export default function ProfileSettings() {
                 <h2 className="text-xl font-bold mb-4">🎯 Goals</h2>
 
                 <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Goal Description</label>
-                    <input
-                        type="text"
-                        value={goalDescription}
-                        onChange={(e) => setGoalDescription(e.target.value)}
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Your Goal</label>
+                    <select
+                        value={goal}
+                        onChange={(e) => {
+                            const newGoal = e.target.value as Goal
+                            setGoal(newGoal)
+                            // Show warning if selecting muscle-gain
+                            if (newGoal === 'muscle-gain') {
+                                setShowBodyCompositionWarning(true)
+                            }
+                        }}
                         className="w-full p-2 border border-white/30 rounded-lg bg-white/50 focus:bg-white/80 transition-all font-medium"
-                        placeholder="e.g., Lose weight, Build muscle, Maintain health"
-                    />
+                    >
+                        <option value="maintenance">⚖️ Maintain Current Weight</option>
+                        <option value="weight-loss">📉 Lose Weight</option>
+                        <option value="muscle-gain">💪 Build Muscle</option>
+                    </select>
+                    <p className="text-xs text-gray-600 mt-2">
+                        {goal === 'weight-loss' && 'Your calorie target will be reduced by ~15% for sustainable weight loss'}
+                        {goal === 'muscle-gain' && 'Your calorie target will be increased by ~15% for lean muscle gain'}
+                        {goal === 'maintenance' && 'Your calorie target will be set to your daily energy expenditure'}
+                    </p>
                 </div>
 
                 <div className="flex items-center gap-2 mb-4">
@@ -204,6 +238,43 @@ export default function ProfileSettings() {
                     </label>
                 </div>
             </div>
+
+            {/* Body Composition Warning Modal */}
+            {showBodyCompositionWarning && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg p-6 max-w-md shadow-2xl">
+                        <h3 className="text-lg font-bold mb-4 text-gray-900">⚠️ Body Composition Check</h3>
+                        <p className="text-gray-700 mb-4">
+                            Building muscle works best when you have room to gain. Before selecting "Build Muscle," consider:
+                        </p>
+                        <ul className="text-sm text-gray-700 space-y-2 mb-4">
+                            <li>✓ You have <strong>less than 25% body fat</strong> (estimated)</li>
+                            <li>✓ You're doing <strong>strength training</strong> regularly</li>
+                            <li>✓ You're getting <strong>adequate protein</strong> (~0.8-1g per lb)</li>
+                        </ul>
+                        <p className="text-sm text-gray-600 mb-4">
+                            If you have high body fat, consider weight loss first to preserve muscle during the cut.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowBodyCompositionWarning(false)}
+                                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                            >
+                                I'm Ready 💪
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowBodyCompositionWarning(false)
+                                    setGoal('maintenance')
+                                }}
+                                className="flex-1 px-4 py-2 bg-gray-300 text-gray-900 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                            >
+                                Choose Different Goal
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Nutritional Targets */}
             <div className="bg-gradient-to-r from-orange-500/90 to-red-500/90 backdrop-blur-xl rounded-xl p-6 text-white shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl">

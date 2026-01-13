@@ -19,7 +19,7 @@ interface AICoachCardProps {
         targetFat: number
     }
     targetCalories: number
-    goalDescription?: string
+    goal?: 'maintenance' | 'weight-loss' | 'muscle-gain'
     // Statistics context data
     statsData?: {
         avgCalories: number
@@ -45,7 +45,7 @@ export default function AICoachCard({
     context,
     todayData,
     targetCalories,
-    goalDescription,
+    goal,
     statsData
 }: AICoachCardProps) {
     const [advice, setAdvice] = useState<string>('')
@@ -103,7 +103,7 @@ export default function AICoachCard({
                 context,
                 todayData,
                 targetCalories,
-                goalDescription,
+                goal,
                 statsData,
             }
 

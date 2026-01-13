@@ -41,7 +41,7 @@ export default function DashboardContent() {
     const [selectedMeal, setSelectedMeal] = useState<any>(null)
     const [mealToDelete, setMealToDelete] = useState<string | null>(null)
     const [editingMealId, setEditingMealId] = useState<string | null>(null)
-    const [goalDescription, setGoalDescription] = useState<string | undefined>()
+    const [goal, setGoal] = useState<'maintenance' | 'weight-loss' | 'muscle-gain' | undefined>()
 
     const [lastUpdateTimestamp, setLastUpdateTimestamp] = useState<number>(() => {
         if (typeof window !== 'undefined') return getLastDataUpdateTime()
@@ -126,7 +126,7 @@ export default function DashboardContent() {
         if (!('error' in profileResult) && profileResult.profile) {
             calculatedTargets = getNutritionalTargets(profileResult.profile)
             setTargets(calculatedTargets)
-            setGoalDescription(profileResult.profile.goal_description || undefined)
+            setGoal(profileResult.profile.goal || undefined)
             localStorage.setItem(CACHE_KEYS.DASHBOARD_TARGETS, JSON.stringify(calculatedTargets))
         }
 
@@ -397,7 +397,7 @@ export default function DashboardContent() {
                             targetFat: targets.fat,
                         }}
                         targetCalories={targets.calories}
-                        goalDescription={goalDescription}
+                        goal={goal}
                     />
 
                 </>

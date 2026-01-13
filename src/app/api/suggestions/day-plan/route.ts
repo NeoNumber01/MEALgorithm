@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
 
 User Profile:
 - Daily Calorie Target: ${targetCalories} kcal
-- Goal: ${profile?.goal_description || 'General health'}
+- Goal: ${profile?.goal === 'weight-loss' ? 'Weight Loss' : profile?.goal === 'muscle-gain' ? 'Muscle Gain' : 'Maintenance'}
 
 Today's Progress:
 - Consumed: ${consumedCalories} kcal
