@@ -20,6 +20,7 @@ export default function ProfileSettings() {
     const [activityLevel, setActivityLevel] = useState<ActivityLevel>('moderate')
     const [goal, setGoal] = useState<Goal>('maintenance')
     const [showBodyCompositionWarning, setShowBodyCompositionWarning] = useState(false)
+    const [showWeightLossWarning, setShowWeightLossWarning] = useState(false)
 
     // Calculated/Custom targets
     const [calorieTarget, setCalorieTarget] = useState(2000)
@@ -207,9 +208,16 @@ export default function ProfileSettings() {
                         onChange={(e) => {
                             const newGoal = e.target.value as Goal
                             setGoal(newGoal)
-                            // Show warning if selecting muscle-gain
+                            // Show warnings based on goal selection
                             if (newGoal === 'muscle-gain') {
                                 setShowBodyCompositionWarning(true)
+                                setShowWeightLossWarning(false)
+                            } else if (newGoal === 'weight-loss') {
+                                setShowWeightLossWarning(true)
+                                setShowBodyCompositionWarning(false)
+                            } else {
+                                setShowBodyCompositionWarning(false)
+                                setShowWeightLossWarning(false)
                             }
                         }}
                         className="w-full p-2 border border-white/30 rounded-lg bg-white/50 focus:bg-white/80 transition-all font-medium"
@@ -265,6 +273,45 @@ export default function ProfileSettings() {
                             <button
                                 onClick={() => {
                                     setShowBodyCompositionWarning(false)
+                                    setGoal('maintenance')
+                                }}
+                                className="flex-1 px-4 py-2 bg-gray-300 text-gray-900 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                            >
+                                Choose Different Goal
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Weight Loss Warning Modal */}
+            {showWeightLossWarning && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg p-6 max-w-md shadow-2xl">
+                        <h3 className="text-lg font-bold mb-4 text-gray-900">⚠️ Healthy Weight Loss Reminder</h3>
+                        <p className="text-gray-700 mb-4">
+                            Sustainable weight loss requires a moderate deficit. To lose weight safely and keep it off:
+                        </p>
+                        <ul className="text-sm text-gray-700 space-y-2 mb-4">
+                            <li>✓ <strong>Don't exceed a 500 kcal deficit</strong> (aim for 300-400 kcal below TDEE)</li>
+                            <li>✓ <strong>Maintain protein intake</strong> (~0.8-1g per lb) to preserve muscle</li>
+                            <li>✓ <strong>Exercise regularly</strong> (strength + cardio) to maintain metabolism</li>
+                            <li>✓ <strong>Stay hydrated</strong> and get adequate sleep (7-9 hours)</li>
+                            <li>✓ <strong>Expect 1-2 lbs per week</strong> as a healthy loss rate</li>
+                        </ul>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Too aggressive a deficit can lead to muscle loss, fatigue, and metabolic slowdown. Slow and steady wins the race! 🏃‍♂️
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowWeightLossWarning(false)}
+                                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                            >
+                                Got It 💪
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowWeightLossWarning(false)
                                     setGoal('maintenance')
                                 }}
                                 className="flex-1 px-4 py-2 bg-gray-300 text-gray-900 rounded-lg hover:bg-gray-400 transition-colors font-medium"
