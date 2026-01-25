@@ -22,6 +22,72 @@ Rules:
    }
 `
 
+interface NutritionResponseItem {
+    name: string
+    quantity?: string
+    nutrition: { calories: number; protein: number; carbs: number; fat: number }
+    confidence?: number
+}
+
+interface NutritionResponseSummary {
+    calories: number
+    protein: number
+    carbs: number
+    fat: number
+}
+
+interface NutritionResponse {
+    items: NutritionResponseItem[]
+    summary: NutritionResponseSummary
+    feedback: string
+}
+
+const suspiciousFeedbackTokens = ["ACCESS GRANTED", "OVERRIDE", "INSTRUCTION IGNORED", "NEW GOAL IS", "I AM NOW"]
+
+const sanitizeUserInput = (text: string): string => {
+    return text
+        .replace(/\[SYSTEM.*?\]:/gi, "")
+        .replace(/IGNORE.*?INSTRUCTIONS/gi, "")
+        .slice(0, 1000)
+}
+
+const isValidNutritionResponse = (data: unknown): data is NutritionResponse => {
+    if (!data || typeof data !== "object") return false
+    const payload = data as Partial<NutritionResponse>
+
+    if (!Array.isArray(payload.items) || payload.items.length === 0) return false
+    if (!payload.summary || typeof payload.summary !== "object") return false
+    if (typeof payload.feedback !== "string") return false
+
+    const summary = payload.summary as Partial<NutritionResponseSummary>
+    const hasSummaryNumbers = [summary.calories, summary.protein, summary.carbs, summary.fat].every(
+        (v) => typeof v === "number",
+    )
+    if (!hasSummaryNumbers) return false
+
+    const itemsValid = payload.items.every((item) => {
+        if (!item || typeof item !== "object") return false
+        const i = item as Partial<NutritionResponseItem>
+        if (typeof i.name !== "string") return false
+        if (!i.nutrition || typeof i.nutrition !== "object") return false
+        const n = i.nutrition as Partial<NutritionResponseItem["nutrition"]>
+        return [n.calories, n.protein, n.carbs, n.fat].every((v) => typeof v === "number")
+    })
+
+    return itemsValid
+}
+
+const hasSuspiciousFeedback = (feedback: string): boolean => {
+    const upper = feedback.toUpperCase()
+    return suspiciousFeedbackTokens.some((token) => upper.includes(token))
+}
+
+const validateNutritionPayload = (data: unknown): string | undefined => {
+    if (!isValidNutritionResponse(data)) return "Invalid nutrition response shape"
+    if (hasSuspiciousFeedback(data.feedback)) return "Suspicious AI response rejected"
+    return undefined
+}
+
 interface MealAnalysisRequest {
     text?: string
     imageBase64?: string
@@ -81,7 +147,10 @@ Deno.serve(async (req: Request) => {
         const body: MealAnalysisRequest = await req.json()
         const { text, imageBase64, imageMimeType, imageDescription } = body
 
-        if (!text && !imageBase64) {
+        const safeText = text ? sanitizeUserInput(text) : undefined
+        const safeImageDescription = imageDescription ? sanitizeUserInput(imageDescription) : undefined
+
+        if (!safeText && !imageBase64) {
             return new Response(JSON.stringify({ error: "No input provided" }), {
                 status: 400,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -91,8 +160,8 @@ Deno.serve(async (req: Request) => {
         // Build prompt parts
         const promptParts: (string | { inlineData: { data: string; mimeType: string } })[] = [SYSTEM_PROMPT]
 
-        if (text) {
-            promptParts.push(`\nUser Text Input: "${text}"`)
+        if (safeText) {
+            promptParts.push(`\nUser Text Input: "${safeText}"`)
         }
 
         if (imageBase64 && imageMimeType) {
@@ -103,8 +172,8 @@ Deno.serve(async (req: Request) => {
                 },
             })
 
-            if (imageDescription) {
-                promptParts.push(`\nIMPORTANT - User's additional notes about this meal: "${imageDescription}"\nPlease consider these details when analyzing portion sizes and nutritional content.`)
+            if (safeImageDescription) {
+                promptParts.push(`\nIMPORTANT - User's additional notes about this meal: "${safeImageDescription}"\nPlease consider these details when analyzing portion sizes and nutritional content.`)
             }
         }
 
@@ -124,6 +193,14 @@ Deno.serve(async (req: Request) => {
         // Parse and validate response
         try {
             const parsed = JSON.parse(responseText)
+            const validationError = validateNutritionPayload(parsed)
+            if (validationError) {
+                return new Response(JSON.stringify({ error: validationError }), {
+                    status: 400,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                })
+            }
+
             return new Response(JSON.stringify({ data: parsed }), {
                 status: 200,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -143,6 +220,14 @@ Deno.serve(async (req: Request) => {
 
             try {
                 const reParsed = JSON.parse(retryText)
+                const validationError = validateNutritionPayload(reParsed)
+                if (validationError) {
+                    return new Response(JSON.stringify({ error: validationError }), {
+                        status: 400,
+                        headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    })
+                }
+
                 return new Response(JSON.stringify({ data: reParsed }), {
                     status: 200,
                     headers: { ...corsHeaders, "Content-Type": "application/json" },
